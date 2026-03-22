@@ -1,0 +1,28 @@
+{
+    "compilerOptions": {
+        "composite": true,
+        "skipLibCheck": true,
+        "module": "ESNext",
+        "moduleResolution": "node",
+        "allowSyntheticDefaultImports": true,
+        "strict": true,
+        "types": [
+            "node"
+        ],
+        "baseUrl": ".",
+        "paths": {
+            "@renderer/*": [
+                "src/renderer/src/*"
+            ],
+            "@shared/*": [
+                "../../packages/shared/*"
+            ]
+        }
+    },
+    "include": [
+        "electron.vite.config.ts",
+        "src/main/**/*",
+        "src/preload/**/*",
+        "resources/**/*"
+    ]
+}

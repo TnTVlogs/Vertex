@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --v-bg-base: #0D0D0F;
+  --v-bg-surface: #1A1B20;
+  --v-bg-sidebar: #121316;
+  --v-accent: #10B981;
+  --v-accent-glow: rgba(16, 185, 129, 0.2);
+  --v-text-primary: #DBDEE1;
+  --v-text-secondary: #949BA4;
+  --v-border: rgba(255, 255, 255, 0.05);
+  --v-glass: rgba(26, 27, 32, 0.7);
+}
+
+html, body {
+  @apply bg-[#0D0D0F] text-[#DBDEE1] overflow-hidden h-full;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-[var(--v-glass)] backdrop-blur-md border border-[var(--v-border)];
+  }
+  
+  .vertex-gradient {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .twemoji {
+    height: 1.25em;
+    width: 1.25em;
+    vertical-align: middle;
+    display: inline-block;
+    margin: 0 0.05em;
+  }
+}
+
+/* Custom scrollbar for some areas */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}

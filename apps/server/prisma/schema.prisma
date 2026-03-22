@@ -1,0 +1,79 @@
+﻿generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  username      String    @unique
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  avatarUrl     String?   @map("avatar_url")
+  status        String    @default("offline")
+  
+  ownedServers  Server[]  @relation("ServerOwner")
+  memberships   Member[]
+  sentMessages  Message[] @relation("MessageAuthor")
+  receivedDMs   Message[] @relation("MessageRecipient")
+
+  @@map("users")
+}
+
+model Server {
+  id        String    @id @default(uuid())
+  name      String
+  iconUrl   String?   @map("icon_url")
+  ownerId   String    @map("owner_id")
+  
+  owner     User      @relation("ServerOwner", fields: [ownerId], references: [id])
+  channels  Channel[]
+  members   Member[]
+
+  @@map("servers")
+}
+
+model Channel {
+  id        String    @id @default(uuid())
+  serverId  String    @map("server_id")
+  name      String
+  type      String    @default("text")
+
+  server    Server    @relation(fields: [serverId], references: [id])
+  messages  Message[]
+
+  @@map("channels")
+}
+
+model Member {
+  id        String    @id @default(uuid())
+  serverId  String    @map("server_id")
+  userId    String    @map("user_id")
+  role      String    @default("member")
+  
+  server    Server    @relation(fields: [serverId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@unique([serverId, userId])
+  @@map("members")
+}
+
+model Message {
+  id            String    @id @default(uuid())
+  content       String    @db.Text
+  attachmentUrl String?   @map("attachment_url")
+  authorId      String    @map("author_id")
+  channelId     String?   @map("channel_id")
+  recipientId   String?   @map("recipient_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  author      User      @relation("MessageAuthor", fields: [authorId], references: [id])
+  channel     Channel?  @relation(fields: [channelId], references: [id])
+  recipient   User?     @relation("MessageRecipient", fields: [recipientId], references: [id])
+
+  @@map("messages")
+}

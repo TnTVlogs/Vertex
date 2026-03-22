@@ -1,0 +1,44 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "useDefineForClassFields": true,
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "composite": true,
+        "strict": true,
+        "jsx": "preserve",
+        "sourceMap": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "esModuleInterop": true,
+        "lib": [
+            "ESNext",
+            "DOM"
+        ],
+        "skipLibCheck": true,
+        "baseUrl": ".",
+        "paths": {
+            "@renderer/*": [
+                "src/renderer/src/*"
+            ],
+            "@shared/*": [
+                "../../packages/shared/*"
+            ]
+        }
+    },
+    "include": [
+        "src/renderer/src/**/*.ts",
+        "src/renderer/src/**/*.d.ts",
+        "src/renderer/src/**/*.tsx",
+        "src/renderer/src/**/*.vue",
+        "src/renderer/index.html"
+    ],
+    "references": [
+        {
+            "path": "./tsconfig.node.json"
+        },
+        {
+            "path": "../../packages/shared"
+        }
+    ]
+}
