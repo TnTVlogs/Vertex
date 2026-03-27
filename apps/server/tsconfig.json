@@ -19,5 +19,10 @@
         {
             "path": "../../packages/shared"
         }
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "prisma.config.ts"
     ]
 }
