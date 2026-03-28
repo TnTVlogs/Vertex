@@ -3,7 +3,10 @@ import MainLayout from './components/MainLayout.vue'
 import Auth from './views/Auth.vue'
 import Splash from './views/Splash.vue'
 import { useAuthStore } from './stores/authStore'
+import { useSettingsStore } from './stores/settingsStore'
 import { onMounted, ref } from 'vue'
+
+const settingsStore = useSettingsStore()
 
 const urlParams = new URLSearchParams(window.location.search);
 const isSplash = ref(urlParams.get('splash') === 'true');

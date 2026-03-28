@@ -3,25 +3,39 @@
 @tailwind utilities;
 
 :root {
-  --v-bg-base: #0D0D0F;
-  --v-bg-surface: #1A1B20;
-  --v-bg-sidebar: #121316;
+  --v-bg-base: #0a0a0a;
+  --v-bg-surface: #141414;
+  --v-bg-sidebar: #0f0f0f;
   --v-accent: #10B981;
-  --v-accent-glow: rgba(16, 185, 129, 0.2);
-  --v-text-primary: #DBDEE1;
-  --v-text-secondary: #949BA4;
-  --v-border: rgba(255, 255, 255, 0.05);
-  --v-glass: rgba(26, 27, 32, 0.7);
+  --v-accent-glow: rgba(16, 185, 129, 0.15);
+  --v-text-primary: #EEEEEE;
+  --v-text-secondary: #888888;
+  --v-border: rgba(255, 255, 255, 0.08);
+  --v-glass: #141414;
+  --v-text-inverse: #0a0a0a;
+}
+
+:root[data-theme="light"] {
+  --v-bg-base: #f7f7f8;
+  --v-bg-surface: #ffffff;
+  --v-bg-sidebar: #ebecf0;
+  --v-accent: #10B981;
+  --v-accent-glow: rgba(16, 185, 129, 0.15);
+  --v-text-primary: #121212;
+  --v-text-secondary: #6e6e73;
+  --v-border: rgba(0, 0, 0, 0.08);
+  --v-glass: #ffffff;
+  --v-text-inverse: #ffffff;
 }
 
 html, body {
-  @apply bg-[#0D0D0F] text-[#DBDEE1] overflow-hidden h-full;
+  @apply bg-[var(--v-bg-base)] text-[var(--v-text-primary)] overflow-hidden h-full;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 @layer utilities {
   .glass {
-    @apply bg-[var(--v-glass)] backdrop-blur-md border border-[var(--v-border)];
+    @apply bg-[var(--v-glass)] border border-[var(--v-border)];
   }
   
   .vertex-gradient {

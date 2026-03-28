@@ -1,10 +1,10 @@
 <template>
-  <div class="absolute bottom-full right-0 mb-4 glass rounded-3xl border border-white/10 shadow-2xl w-72 animate-in slide-in-from-bottom-4 duration-300 overflow-hidden flex flex-col h-80">
+  <div class="absolute bottom-full right-0 mb-4 glass rounded-3xl shadow-2xl w-72 animate-in slide-in-from-bottom-4 duration-300 overflow-hidden flex flex-col h-80">
     <!-- Category Tabs (Icons) -->
     <div 
       ref="categoryContainer"
       @wheel.prevent="handleWheel"
-      class="flex overflow-x-auto emoji-category-scroll border-b border-white/5 p-1.5 bg-white/5 scroll-smooth"
+      class="flex overflow-x-auto emoji-category-scroll border-b border-[var(--v-border)] p-1.5 bg-[var(--v-bg-base)] scroll-smooth"
     >
       <button 
         v-for="(emojis, cat) in EMOJI_CATEGORIES" :key="cat"

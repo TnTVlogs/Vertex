@@ -36,8 +36,8 @@
             class="px-3 py-1.5 rounded-2xl text-[13px] leading-relaxed shadow-sm border transition-all select-text"
             :class="[
               msg.authorId === authStore.user?.id 
-                ? 'bg-[var(--v-accent)] text-[var(--v-bg-base)] font-medium border-transparent shadow-[0_4px_15px_var(--v-accent-glow)]' 
-                : 'bg-white/5 border-[var(--v-border)] text-white hover:border-white/10',
+                ? 'bg-[var(--v-accent)] text-white font-medium border-transparent shadow-[0_4px_15px_var(--v-accent-glow)]' 
+                : 'bg-[var(--v-bg-surface)] border-[var(--v-border)] text-[var(--v-text-primary)] hover:border-[var(--v-accent)]',
               shouldShowAuthor(msg, index) 
                 ? (msg.authorId === authStore.user?.id ? 'rounded-br-sm' : 'rounded-bl-sm')
                 : 'rounded-xl'
@@ -54,7 +54,7 @@
     </div>
 
     <!-- Fixed Input Area -->
-    <div class="bg-[var(--v-bg-base)] border-t border-white/5 p-6 z-20">
+    <div class="bg-[var(--v-bg-base)] border-t border-[var(--v-border)] p-6 z-20">
        <div class="max-w-4xl mx-auto relative" ref="inputContainer">
          <!-- Emoji Picker Overlay (Componentized) -->
          <EmojiPicker 
@@ -62,8 +62,8 @@
            @select="addEmoji"
          />
 
-         <div class="glass rounded-2xl p-2 shadow-2xl border border-white/10 flex items-center">
-           <button class="w-10 h-10 flex items-center justify-center text-[var(--v-text-secondary)] hover:text-white transition-colors">
+         <div class="glass rounded-2xl p-2 shadow-2xl flex items-center">
+           <button class="w-10 h-10 flex items-center justify-center text-[var(--v-text-secondary)] hover:text-[var(--v-text-primary)] transition-colors">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
            </button>
            <div 
@@ -72,7 +72,7 @@
              @keydown.enter.prevent="handleSend"
              @input="handleInput"
              @paste="handlePaste"
-             class="flex-1 bg-transparent border-none outline-none px-4 py-2 text-sm font-medium text-white placeholder-empty tracking-wide overflow-y-auto max-h-32 min-h-[1.5em]"
+             class="flex-1 bg-transparent border-none outline-none px-4 py-2 text-sm font-medium text-[var(--v-text-primary)] tracking-wide overflow-y-auto max-h-32 min-h-[1.5em]"
              data-placeholder="TRANSMIT DATA PACKET..."
            ></div>
            <div class="flex items-center pr-2 space-x-1">

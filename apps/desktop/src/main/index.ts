@@ -8,7 +8,7 @@ import { registerAuthHandlers } from './ipc/authHandlers'
 // Variables globals equivalents a env per al Main Process
 // Per prod, asumim que Vertex corre sota HTTPS al teu domini
 const isDev = is.dev || !app.isPackaged;
-const API_URL = isDev ? 'http://localhost:3000/api/v1' : 'https://vertex.sergidalmau.dev/api/v1';
+const API_URL = (import.meta as any).env.VITE_API_URL || 'https://vertex.sergidalmau.dev/api/v1';
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;

@@ -1,8 +1,8 @@
 <template>
   <div class="relative flex items-center justify-center min-h-screen bg-[var(--v-bg-base)] text-white overflow-hidden p-6 selection:bg-[var(--v-accent)] selection:text-[var(--v-bg-base)]">
     <!-- Dynamic Background Accents -->
-    <div class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-[var(--v-accent)] opacity-10 blur-[120px] rounded-full"></div>
-    <div class="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-[#4F46E5] opacity-10 blur-[150px] rounded-full"></div>
+    <div class="absolute top-0 right-0 w-[40%] h-[40%] bg-[var(--v-accent)] opacity-[0.05] blur-[120px] rounded-full"></div>
+    <div class="absolute -bottom-[10%] -left-[10%] w-[50%] h-[50%] bg-[var(--v-accent)] opacity-[0.08] blur-[150px] rounded-full"></div>
     
     <!-- Auth Card -->
     <div class="w-full max-w-[440px] z-10 animate-in fade-in zoom-in duration-700">
@@ -17,7 +17,7 @@
         <p class="text-[var(--v-text-secondary)] mt-2 text-xs font-bold uppercase tracking-[0.4em]">Integrated Subsystem</p>
       </div>
 
-      <div class="glass p-10 rounded-3xl shadow-2xl border border-white/10 relative overflow-hidden group">
+      <div class="glass p-10 rounded-3xl shadow-2xl relative overflow-hidden group">
         <!-- Error Display -->
         <div v-if="error" class="absolute top-0 left-0 right-0 bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-red-400 text-[10px] font-black uppercase tracking-widest text-center animate-in slide-in-from-top duration-300">
           {{ error }}
@@ -30,7 +30,7 @@
               v-model="username" 
               type="text" 
               placeholder="IDENTIFIER_01"
-              class="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-3.5 text-sm font-medium focus:border-[var(--v-accent)] focus:bg-white/10 outline-none transition-all placeholder-white/20" 
+              class="w-full bg-[var(--v-bg-base)] border border-[var(--v-border)] rounded-2xl px-5 py-3.5 text-sm font-medium focus:border-[var(--v-accent)] outline-none transition-all placeholder-white/20" 
               required 
             />
           </div>
@@ -41,7 +41,7 @@
               v-model="email" 
               type="email" 
               placeholder="user@vertex.core"
-              class="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-3.5 text-sm font-medium focus:border-[var(--v-accent)] focus:bg-white/10 outline-none transition-all placeholder-white/20" 
+              class="w-full bg-[var(--v-bg-base)] border border-[var(--v-border)] rounded-2xl px-5 py-3.5 text-sm font-medium focus:border-[var(--v-accent)] outline-none transition-all placeholder-white/20" 
               required 
             />
           </div>
@@ -52,7 +52,7 @@
               v-model="password" 
               type="password" 
               placeholder="••••••••••••"
-              class="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-3.5 text-sm font-medium focus:border-[var(--v-accent)] focus:bg-white/10 outline-none transition-all placeholder-white/20" 
+              class="w-full bg-[var(--v-bg-base)] border border-[var(--v-border)] rounded-2xl px-5 py-3.5 text-sm font-medium focus:border-[var(--v-accent)] outline-none transition-all placeholder-white/20" 
               required 
             />
           </div>
