@@ -27,5 +27,10 @@ declare interface Window {
     saveRefreshToken: (token: string) => Promise<boolean>
     getRefreshToken: () => Promise<string | null>
     clearRefreshToken: () => Promise<boolean>
+
+    // Splash Screen Handlers
+    onSplashMessage: (callback: (event: any, data: { message: string, progress?: number, isError?: boolean }) => void) => void
+    splashRetry: () => void
+    splashQuit: () => void
   }
 }

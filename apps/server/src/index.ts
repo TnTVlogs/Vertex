@@ -33,6 +33,11 @@ app.use('/api/v1/social', socialRoutes);
 app.use('/api/v1/servers', serverRoutes);
 app.use('/api/v1/messages', messagesRoutes);
 
+// Health check endpoint for Desktop App
+app.get('/api/v1/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
 // Initialize services
 const init = async () => {
     try {

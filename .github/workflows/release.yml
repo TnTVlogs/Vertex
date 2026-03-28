@@ -1,0 +1,81 @@
+name: Release Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*' # S'activa automàticament si fas push a un tag de versió (ex: git tag v1.0.0 && git push --tags)
+  workflow_dispatch: # Permet executar manualment des de pestanya Actions a GitHub
+
+jobs:
+  release:
+    name: Build & Release on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest] # Construeix en els 3 SOs en paral·lel
+
+    permissions:
+      contents: write # Serveix per poder penjar fitxers al Release
+      
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Obtenir tot l'historial per poder autogenerar la llista de commits
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20 # Mateixa NodeJS que el teu entorn dev
+
+      - name: Get Desktop Version
+        id: version
+        working-directory: ./apps/desktop
+        run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Determine Tag Name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "TAG_NAME=v${{ steps.version.outputs.VERSION }}" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Install dependencies
+        working-directory: ./apps/desktop
+        run: npm install
+
+      # Depedències extres per muntar AppImages a Ubuntu
+      - name: Install Linux build dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libopenjp2-7
+
+      - name: Build Windows Executable
+        if: matrix.os == 'windows-latest'
+        working-directory: ./apps/desktop
+        run: npm run build:win
+
+      - name: Build macOS DMG
+        if: matrix.os == 'macos-latest'
+        working-directory: ./apps/desktop
+        run: npm run build:mac
+
+      - name: Build Linux AppImage
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: ./apps/desktop
+        run: npm run build:linux
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.TAG_NAME }}
+          generate_release_notes: true # 👈 AIXÒ llegeix els teus últims commits/PR per autogenerar la descripció dels canvis!
+          files: |
+            apps/desktop/dist/*.exe
+            apps/desktop/dist/*.dmg
+            apps/desktop/dist/*.AppImage

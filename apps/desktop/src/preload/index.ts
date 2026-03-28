@@ -12,6 +12,14 @@ const api = {
     saveRefreshToken: (token: string) => ipcRenderer.invoke('auth:save-refresh-token', token),
     getRefreshToken: () => ipcRenderer.invoke('auth:get-refresh-token'),
     clearRefreshToken: () => ipcRenderer.invoke('auth:clear-refresh-token'),
+
+    // Splash Screen Handlers
+    onSplashMessage: (callback: (event: any, data: { message: string, progress?: number, isError?: boolean }) => void) => {
+        ipcRenderer.removeAllListeners('splash:message');
+        ipcRenderer.on('splash:message', callback);
+    },
+    splashRetry: () => ipcRenderer.send('splash:retry'),
+    splashQuit: () => ipcRenderer.send('splash:quit'),
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

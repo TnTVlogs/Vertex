@@ -1,6 +1,7 @@
 {
   "name": "vertex-desktop",
   "version": "1.0.0",
+  "repository": "https://github.com/TnTVlogs/Vertex",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -36,6 +37,9 @@
     "productName": "Vertex",
     "directories": {
       "output": "dist"
+    },
+    "publish": {
+      "provider": "github"
     },
     "files": [
       "out/**/*",
