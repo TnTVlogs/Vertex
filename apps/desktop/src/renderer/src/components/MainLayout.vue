@@ -27,29 +27,24 @@ function openDM(recipientId: string) {
   navStore.setDM(recipientId)
   chatStore.activeChannelId = null
   chatStore.activeRecipientId = recipientId
-  chatStore.messages = []
+  chatStore.clearMessages()
 }
 
 function openChannel(serverId: string, channelId: string) {
   navStore.setServer(serverId, channelId)
   chatStore.activeChannelId = channelId
   chatStore.activeRecipientId = null
-  chatStore.messages = []
+  chatStore.clearMessages()
 }
 
 onMounted(async () => {
-  console.log('MainLayout: onMounted, user:', authStore.user?.id);
-  console.log('MainLayout: chatStore debug:', chatStore._debug);
-  
   chatStore.connect()
   
-  console.log('MainLayout: Triggering fetches');
   await Promise.all([
     chatStore.fetchFriends(),
     chatStore.fetchServers(),
     chatStore.fetchRequests()
   ])
-  console.log('MainLayout: Fetches completed. Friend requests:', chatStore.friendRequests?.length);
 })
 
 const handleLogout = () => {

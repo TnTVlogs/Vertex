@@ -1,8 +1,8 @@
-import { app, shell, BrowserWindow, ipcMain, safeStorage } from 'electron'
+import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
-import { writeFileSync, readFileSync, existsSync, unlinkSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from './resources/icon.png?asset'
+import { registerAuthHandlers } from './ipc/authHandlers'
 
 function createWindow(): void {
     // Create the browser window.
@@ -50,6 +50,9 @@ app.whenReady().then(() => {
         optimizer.watchWindowShortcuts(window)
     })
 
+    // Register IPC handlers from modules
+    registerAuthHandlers()
+
     createWindow()
 
     app.on('activate', function () {
@@ -67,81 +70,3 @@ app.on('window-all-closed', () => {
         app.quit()
     }
 })
-
-// ── ACCESS TOKEN (session.bin) ───────────────────────────────────────────────
-const TOKEN_PATH = join(app.getPath('userData'), 'session.bin');
-
-ipcMain.handle('auth:save-token', async (_, token: string) => {
-    try {
-        if (!safeStorage.isEncryptionAvailable()) return false;
-        const encrypted = safeStorage.encryptString(token);
-        writeFileSync(TOKEN_PATH, encrypted);
-        return true;
-    } catch (e) {
-        console.error('Failed to save token:', e);
-        return false;
-    }
-});
-
-ipcMain.handle('auth:load-token', async () => {
-    try {
-        if (!existsSync(TOKEN_PATH)) return null;
-        if (!safeStorage.isEncryptionAvailable()) return null;
-        const encrypted = readFileSync(TOKEN_PATH);
-        return safeStorage.decryptString(encrypted);
-    } catch (e) {
-        console.error('Failed to load token:', e);
-        return null;
-    }
-});
-
-ipcMain.handle('auth:clear-token', async () => {
-    try {
-        if (existsSync(TOKEN_PATH)) {
-            unlinkSync(TOKEN_PATH);
-        }
-        return true;
-    } catch (e) {
-        console.error('Failed to clear token:', e);
-        return false;
-    }
-});
-
-// ── REFRESH TOKEN (refresh.bin) ──────────────────────────────────────────────
-const REFRESH_TOKEN_PATH = join(app.getPath('userData'), 'refresh.bin');
-
-ipcMain.handle('auth:save-refresh-token', async (_, token: string) => {
-    try {
-        if (!safeStorage.isEncryptionAvailable()) return false;
-        const encrypted = safeStorage.encryptString(token);
-        writeFileSync(REFRESH_TOKEN_PATH, encrypted);
-        return true;
-    } catch (e) {
-        console.error('Failed to save refresh token:', e);
-        return false;
-    }
-});
-
-ipcMain.handle('auth:get-refresh-token', async () => {
-    try {
-        if (!existsSync(REFRESH_TOKEN_PATH)) return null;
-        if (!safeStorage.isEncryptionAvailable()) return null;
-        const encrypted = readFileSync(REFRESH_TOKEN_PATH);
-        return safeStorage.decryptString(encrypted);
-    } catch (e) {
-        console.error('Failed to get refresh token:', e);
-        return null;
-    }
-});
-
-ipcMain.handle('auth:clear-refresh-token', async () => {
-    try {
-        if (existsSync(REFRESH_TOKEN_PATH)) {
-            unlinkSync(REFRESH_TOKEN_PATH);
-        }
-        return true;
-    } catch (e) {
-        console.error('Failed to clear refresh token:', e);
-        return false;
-    }
-});
