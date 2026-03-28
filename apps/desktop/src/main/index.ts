@@ -68,9 +68,7 @@ app.on('window-all-closed', () => {
     }
 })
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
-
+// ── ACCESS TOKEN (session.bin) ───────────────────────────────────────────────
 const TOKEN_PATH = join(app.getPath('userData'), 'session.bin');
 
 ipcMain.handle('auth:save-token', async (_, token: string) => {
@@ -105,6 +103,45 @@ ipcMain.handle('auth:clear-token', async () => {
         return true;
     } catch (e) {
         console.error('Failed to clear token:', e);
+        return false;
+    }
+});
+
+// ── REFRESH TOKEN (refresh.bin) ──────────────────────────────────────────────
+const REFRESH_TOKEN_PATH = join(app.getPath('userData'), 'refresh.bin');
+
+ipcMain.handle('auth:save-refresh-token', async (_, token: string) => {
+    try {
+        if (!safeStorage.isEncryptionAvailable()) return false;
+        const encrypted = safeStorage.encryptString(token);
+        writeFileSync(REFRESH_TOKEN_PATH, encrypted);
+        return true;
+    } catch (e) {
+        console.error('Failed to save refresh token:', e);
+        return false;
+    }
+});
+
+ipcMain.handle('auth:get-refresh-token', async () => {
+    try {
+        if (!existsSync(REFRESH_TOKEN_PATH)) return null;
+        if (!safeStorage.isEncryptionAvailable()) return null;
+        const encrypted = readFileSync(REFRESH_TOKEN_PATH);
+        return safeStorage.decryptString(encrypted);
+    } catch (e) {
+        console.error('Failed to get refresh token:', e);
+        return null;
+    }
+});
+
+ipcMain.handle('auth:clear-refresh-token', async () => {
+    try {
+        if (existsSync(REFRESH_TOKEN_PATH)) {
+            unlinkSync(REFRESH_TOKEN_PATH);
+        }
+        return true;
+    } catch (e) {
+        console.error('Failed to clear refresh token:', e);
         return false;
     }
 });

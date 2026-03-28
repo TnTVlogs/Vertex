@@ -15,3 +15,17 @@ declare module '@twemoji/api' {
 
   export default twemoji;
 }
+
+// Tipus per a l'API exposada pel preload d'Electron
+declare interface Window {
+  api: {
+    // Access Token (session.bin)
+    saveToken: (token: string) => Promise<boolean>
+    loadToken: () => Promise<string | null>
+    clearToken: () => Promise<boolean>
+    // Refresh Token (refresh.bin)
+    saveRefreshToken: (token: string) => Promise<boolean>
+    getRefreshToken: () => Promise<string | null>
+    clearRefreshToken: () => Promise<boolean>
+  }
+}

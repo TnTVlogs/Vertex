@@ -3,9 +3,15 @@ import { exposeElectronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
 const api = {
+    // Access Token
     saveToken: (token: string) => ipcRenderer.invoke('auth:save-token', token),
     loadToken: () => ipcRenderer.invoke('auth:load-token'),
-    clearToken: () => ipcRenderer.invoke('auth:clear-token')
+    clearToken: () => ipcRenderer.invoke('auth:clear-token'),
+
+    // Refresh Token (guardat encriptat a refresh.bin via safeStorage)
+    saveRefreshToken: (token: string) => ipcRenderer.invoke('auth:save-refresh-token', token),
+    getRefreshToken: () => ipcRenderer.invoke('auth:get-refresh-token'),
+    clearRefreshToken: () => ipcRenderer.invoke('auth:clear-refresh-token'),
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

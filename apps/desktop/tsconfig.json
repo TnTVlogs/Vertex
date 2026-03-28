@@ -15,6 +15,7 @@
             "ESNext",
             "DOM"
         ],
+        "types": ["vite/client"],
         "skipLibCheck": true,
         "baseUrl": ".",
         "paths": {
