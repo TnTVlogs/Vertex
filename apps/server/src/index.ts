@@ -19,7 +19,8 @@ const io = new Server(httpServer, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"]
-    }
+    },
+    transports: ['websocket', 'polling'] // Prioritize websocket for stability through Apache
 });
 
 app.set('io', io);
@@ -27,10 +28,11 @@ app.set('io', io);
 app.use(cors());
 app.use(express.json());
 
-app.use('/auth', authRoutes);
-app.use('/social', socialRoutes);
-app.use('/servers', serverRoutes);
-app.use('/messages', messagesRoutes);
+// Routes prefixed with /api/v1
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/social', socialRoutes);
+app.use('/api/v1/servers', serverRoutes);
+app.use('/api/v1/messages', messagesRoutes);
 
 // Initialize services
 const init = async () => {

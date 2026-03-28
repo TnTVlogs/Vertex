@@ -33,7 +33,7 @@ export const useChatStore = defineStore('chat', {
             const authStore = useAuthStore()
             if (!authStore.user) return
             try {
-                const res = await fetch(`http://localhost:3000/social/friends/${authStore.user.id}`)
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/social/friends/${authStore.user.id}`)
                 if (res.ok) {
                     this.friends = await res.json()
                     console.log('chatStore: friends updated', this.friends.length);
@@ -45,7 +45,7 @@ export const useChatStore = defineStore('chat', {
             const authStore = useAuthStore()
             if (!authStore.user) return
             try {
-                const res = await fetch(`http://localhost:3000/servers/user/${authStore.user.id}`)
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/servers/user/${authStore.user.id}`)
                 if (res.ok) {
                     this.servers = await res.json()
                 }
@@ -56,7 +56,7 @@ export const useChatStore = defineStore('chat', {
             const authStore = useAuthStore()
             if (!authStore.user) return
             try {
-                const url = `http://localhost:3000/social/requests/${authStore.user.id}`;
+                const url = `${import.meta.env.VITE_API_URL}/social/requests/${authStore.user.id}`;
                 console.log('chatStore: fetching requests from', url);
                 const res = await fetch(url)
                 if (res.ok) {
@@ -70,7 +70,7 @@ export const useChatStore = defineStore('chat', {
 
         async respondToRequest(requestId: string, status: 'accepted' | 'declined') {
             try {
-                const res = await fetch('http://localhost:3000/social/request/respond', {
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/social/request/respond`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ requestId, status })
@@ -84,7 +84,7 @@ export const useChatStore = defineStore('chat', {
 
         async fetchChannels(serverId: string) {
             try {
-                const res = await fetch(`http://localhost:3000/servers/${serverId}/channels`)
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/servers/${serverId}/channels`)
                 if (res.ok) {
                     this.channels = await res.json()
                 }
@@ -95,7 +95,7 @@ export const useChatStore = defineStore('chat', {
             const authStore = useAuthStore()
             if (!authStore.user) return
             try {
-                const url = new URL(`http://localhost:3000/messages/${targetId}`);
+                const url = new URL(`${import.meta.env.VITE_API_URL}/messages/${targetId}`);
                 url.searchParams.append('type', type);
                 url.searchParams.append('userId', authStore.user.id);
 
@@ -110,7 +110,9 @@ export const useChatStore = defineStore('chat', {
             const authStore = useAuthStore()
             if (!this.socket) {
                 console.log('chatStore: connecting socket...');
-                this.socket = io('http://localhost:3000')
+                this.socket = io(import.meta.env.VITE_SOCKET_URL, {
+                    transports: ['websocket']
+                })
 
                 this.socket.on('connect', () => {
                     const user = authStore.user;

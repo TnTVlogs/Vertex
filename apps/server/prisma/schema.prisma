@@ -5,7 +5,6 @@
 
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -21,7 +20,37 @@ model User {
   sentMessages  Message[] @relation("MessageAuthor")
   receivedDMs   Message[] @relation("MessageRecipient")
 
+  // Relationships for friends
+  sentRequests     FriendRequest[] @relation("RequestSender")
+  receivedRequests FriendRequest[] @relation("RequestReceiver")
+  friends1         Friendship[]    @relation("Friend1")
+  friends2         Friendship[]    @relation("Friend2")
+
   @@map("users")
+}
+
+model FriendRequest {
+  id        String @id @default(uuid())
+  fromId    String @map("from_id")
+  toId      String @map("to_id")
+  status    String @default("pending")
+
+  from User @relation("RequestSender", fields: [fromId], references: [id])
+  to   User @relation("RequestReceiver", fields: [toId], references: [id])
+
+  @@map("friend_requests")
+}
+
+model Friendship {
+  id      String @id @default(uuid())
+  user1Id String @map("user1_id")
+  user2Id String @map("user2_id")
+
+  user1 User @relation("Friend1", fields: [user1Id], references: [id])
+  user2 User @relation("Friend2", fields: [user2Id], references: [id])
+
+  @@unique([user1Id, user2Id])
+  @@map("friendships")
 }
 
 model Server {
