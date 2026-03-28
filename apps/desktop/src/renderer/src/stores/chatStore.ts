@@ -111,7 +111,7 @@ export const useChatStore = defineStore('chat', {
             if (!this.socket) {
                 console.log('chatStore: connecting socket...');
                 this.socket = io(import.meta.env.VITE_SOCKET_URL, {
-                    transports: ['websocket']
+                    transports: ['websocket', 'polling']
                 })
 
                 this.socket.on('connect', () => {

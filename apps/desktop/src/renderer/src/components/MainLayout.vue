@@ -58,7 +58,7 @@ const handleLogout = () => {
 
 const onAddFriend = async (username: string) => {
   if (!username) return
-  const res = await fetch('http://localhost:3000/social/request', {
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/social/request`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fromId: authStore.user?.id, toUsername: username })
@@ -75,7 +75,7 @@ const onAddFriend = async (username: string) => {
 
 const onCreateServer = async (name: string) => {
   if (!name) return
-  const res = await fetch('http://localhost:3000/servers/create', {
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/servers/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, ownerId: authStore.user?.id })
