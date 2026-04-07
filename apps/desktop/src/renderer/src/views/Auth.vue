@@ -13,8 +13,8 @@
             <path d="M13 2L3 14h9l-1 8L21 10h-9l1-8z"/>
           </svg>
         </div>
-        <h1 class="text-4xl font-black italic tracking-tighter text-white">VERTEX <span class="text-[var(--v-accent)] not-italic tracking-normal font-mono opacity-50">CORE</span></h1>
-        <p class="text-[var(--v-text-secondary)] mt-2 text-xs font-bold uppercase tracking-[0.4em]">Integrated Subsystem</p>
+        <h1 class="text-4xl font-black italic tracking-tighter text-white">{{ i18n.t('auth.welcome') }} <span class="text-[var(--v-accent)] not-italic tracking-normal font-mono opacity-50">{{ i18n.t('auth.welcomesub') }}</span></h1>
+        <p class="text-[var(--v-text-secondary)] mt-2 text-xs font-bold uppercase tracking-[0.4em]">{{ i18n.t('auth.subtitle') }}</p>
       </div>
 
       <div class="glass p-10 rounded-3xl shadow-2xl relative overflow-hidden group">
@@ -25,7 +25,7 @@
 
         <form @submit.prevent="handleSubmit" class="space-y-6 pt-4">
           <div v-if="!isLogin" class="space-y-1.5 group-input">
-            <label class="block text-[10px] font-black text-[var(--v-text-secondary)] uppercase tracking-widest px-1">Username Handle</label>
+            <label class="block text-[10px] font-black text-[var(--v-text-secondary)] uppercase tracking-widest px-1">{{ i18n.t('auth.username') }}</label>
             <input 
               v-model="username" 
               type="text" 
@@ -36,7 +36,7 @@
           </div>
           
           <div class="space-y-1.5 group-input">
-            <label class="block text-[10px] font-black text-[var(--v-text-secondary)] uppercase tracking-widest px-1">Email Endpoint</label>
+            <label class="block text-[10px] font-black text-[var(--v-text-secondary)] uppercase tracking-widest px-1">{{ i18n.t('auth.email') }}</label>
             <input 
               v-model="email" 
               type="email" 
@@ -47,7 +47,7 @@
           </div>
 
           <div class="space-y-1.5 group-input">
-            <label class="block text-[10px] font-black text-[var(--v-text-secondary)] uppercase tracking-widest px-1">Encryption Key</label>
+            <label class="block text-[10px] font-black text-[var(--v-text-secondary)] uppercase tracking-widest px-1">{{ i18n.t('auth.password') }}</label>
             <input 
               v-model="password" 
               type="password" 
@@ -58,13 +58,13 @@
           </div>
 
           <button type="submit" class="w-full vertex-gradient text-[var(--v-bg-base)] font-black py-4 rounded-2xl mt-4 shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all text-xs tracking-[0.2em] uppercase">
-            {{ isLogin ? 'INITIATE_UPLINK' : 'REGISTER_PROTOCOL' }}
+            {{ isLogin ? i18n.t('auth.login_btn') : i18n.t('auth.register_btn') }}
           </button>
         </form>
 
         <div class="mt-8 pt-8 border-t border-white/5 text-center">
           <button @click="isLogin = !isLogin; error = ''" class="text-[10px] font-black text-[var(--v-text-secondary)] hover:text-[var(--v-accent)] uppercase tracking-widest transition-colors">
-            {{ isLogin ? "Create New Node Profile" : "Existing Endpoint? Access Here" }}
+            {{ isLogin ? i18n.t('auth.switch_register') : i18n.t('auth.switch_login') }}
           </button>
         </div>
       </div>
@@ -73,11 +73,11 @@
       <div class="mt-8 flex items-center justify-center space-x-6">
         <div class="flex items-center space-x-2">
            <div class="w-1.5 h-1.5 bg-[var(--v-accent)] rounded-full animate-pulse shadow-[0_0_8px_var(--v-accent)]"></div>
-           <span class="text-[9px] font-black text-[var(--v-text-secondary)] uppercase tracking-widest">Mainframe_Online</span>
+           <span class="text-[9px] font-black text-[var(--v-text-secondary)] uppercase tracking-widest">{{ i18n.t('auth.status_online') }}</span>
         </div>
         <div class="flex items-center space-x-2 opacity-50">
            <div class="w-1.5 h-1.5 bg-white rounded-full"></div>
-           <span class="text-[9px] font-black text-[var(--v-text-secondary)] uppercase tracking-widest">v1.2.4-STABLE</span>
+           <span class="text-[9px] font-black text-[var(--v-text-secondary)] uppercase tracking-widest">v{{ appVersion }}-STABLE</span>
         </div>
       </div>
     </div>
@@ -87,8 +87,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAuthStore } from '../stores/authStore'
+import { useI18nStore } from '../stores/i18nStore'
+import pkg from '../../../../package.json'
 
 const authStore = useAuthStore()
+const i18n = useI18nStore()
+const appVersion = pkg.version
 const isLogin = ref(true)
 const username = ref('')
 const email = ref('')
@@ -108,14 +112,14 @@ async function handleSubmit() {
       })
       if (response.ok) {
         isLogin.value = true
-        error.value = 'Uplink Registered. Access Granted.'
+        error.value = i18n.t('auth.success_register')
       } else {
         const data = await response.json()
-        error.value = data.error || 'Uplink Failed.'
+        error.value = data.error || i18n.t('auth.error_failed')
       }
     }
   } catch (err: any) {
-    error.value = err.message || 'System Interrupt Detected'
+    error.value = err.message || i18n.t('auth.error_failed')
   }
 }
 </script>

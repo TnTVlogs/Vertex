@@ -33,7 +33,8 @@
             </span>
           </div>
           <div 
-            class="px-3 py-1.5 rounded-2xl text-[13px] leading-relaxed shadow-sm border transition-all select-text"
+            class="px-3 py-1.5 rounded-2xl leading-relaxed shadow-sm border transition-all select-text"
+            :style="{ fontSize: `${settingsStore.chatFontSize}px` }"
             :class="[
               msg.authorId === authStore.user?.id 
                 ? 'bg-[var(--v-accent)] text-white font-medium border-transparent shadow-[0_4px_15px_var(--v-accent-glow)]' 
@@ -49,7 +50,7 @@
       </div>
       
       <div v-if="chatStore.sortedMessages.length === 0" class="flex-1 flex flex-col items-center justify-center pt-20 opacity-20">
-         <p class="text-xs font-black tracking-[0.3em] italic">NO LOGS RECORDED IN THIS SECTOR</p>
+         <p class="text-xs font-black tracking-[0.3em] italic uppercase">{{ i18n.t('chat.no_logs') }}</p>
       </div>
     </div>
 
@@ -73,7 +74,7 @@
              @input="handleInput"
              @paste="handlePaste"
              class="flex-1 bg-transparent border-none outline-none px-4 py-2 text-sm font-medium text-[var(--v-text-primary)] tracking-wide overflow-y-auto max-h-32 min-h-[1.5em]"
-             data-placeholder="TRANSMIT DATA PACKET..."
+             :data-placeholder="i18n.t('chat.placeholder')"
            ></div>
            <div class="flex items-center pr-2 space-x-1">
               <button 
@@ -84,7 +85,7 @@
                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5s.67 1.5 1.5 1.5zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
               </button>
               <button @click="handleSend" class="px-4 py-2 rounded-xl vertex-gradient text-[var(--v-bg-base)] text-[10px] font-black shadow-lg hover:scale-105 active:scale-95 transition-all">
-                SEND
+                {{ i18n.t('chat.send') }}
               </button>
            </div>
          </div>
@@ -97,11 +98,15 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
+import { useSettingsStore } from '../stores/settingsStore'
+import { useI18nStore } from '../stores/i18nStore'
 import EmojiPicker from './EmojiPicker.vue'
 import { parseEmojis, getEmojiUrl } from '../utils/emoji'
 
 const chatStore = useChatStore()
 const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
+const i18n = useI18nStore()
 const showEmojiPicker = ref(false)
 const messageContainer = ref<HTMLElement | null>(null)
 const chatInput = ref<HTMLElement | null>(null)

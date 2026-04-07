@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
-import icon from './resources/icon.png?asset'
+import icon from '../../resources/icon.png?asset'
 import { registerAuthHandlers } from './ipc/authHandlers'
 
 // Variables globals equivalents a env per al Main Process
@@ -44,7 +44,7 @@ function createMainWindow(): void {
     } else {
         mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
     }
-    
+
     // Si la Splash existeix encara, la matem perquè ja hem superat els controls
     if (splashWindow) {
         splashWindow.destroy()
@@ -58,7 +58,7 @@ function createSplashWindow(): void {
         width: 400,
         height: 500,
         frame: false,
-        transparent: process.platform !== 'linux', 
+        transparent: process.platform !== 'linux',
         resizable: false,
         alwaysOnTop: true,
         show: false,
@@ -94,9 +94,9 @@ async function checkServerHealth(retries = 3, delay = 5000): Promise<boolean> {
     for (let i = 0; i < retries; i++) {
         try {
             sendSplashStatus(`Connectant amb el servidor... (Intent ${i + 1}/${retries})`);
-            const res = await fetch(`${API_URL}/health`, { 
+            const res = await fetch(`${API_URL}/health`, {
                 method: 'GET',
-                signal: AbortSignal.timeout(5000) 
+                signal: AbortSignal.timeout(5000)
             });
             if (res.ok) {
                 const data = await res.json();
@@ -105,7 +105,7 @@ async function checkServerHealth(retries = 3, delay = 5000): Promise<boolean> {
         } catch (error) {
             console.error(`Health check attempt ${i + 1} failed:`, error);
         }
-        
+
         if (i < retries - 1) {
             // Wait before next retry
             await new Promise(resolve => setTimeout(resolve, delay));
@@ -116,14 +116,16 @@ async function checkServerHealth(retries = 3, delay = 5000): Promise<boolean> {
 
 async function runHealthCheckSequence() {
     const isHealthy = await checkServerHealth();
-    
+
     if (isHealthy) {
         // Seridor OK! Busquem actualitzacions.
         sendSplashStatus('Cercant actualitzacions...');
-        
+
         if (isDev) {
-            // Si estem en dev, l'AutoUpdater falla, per tant l'esquivem.
-            sendSplashStatus('Mode DEV: Obviant updates...');
+            // En mode DEV, no volem que l'autoUpdater faci absolutament res.
+            sendSplashStatus('Mode DEV: Actualitzacions desactivades.');
+            autoUpdater.autoDownload = false;
+            autoUpdater.autoInstallOnAppQuit = false;
             setTimeout(() => {
                 createMainWindow();
             }, 500);
