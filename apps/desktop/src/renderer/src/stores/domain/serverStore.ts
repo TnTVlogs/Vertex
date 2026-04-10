@@ -16,7 +16,9 @@ export const useServerStore = defineStore('server', {
         },
         isOwner() {
             const authStore = useAuthStore();
-            return this.currentServer?.ownerId === authStore.user?.id;
+            const server = this.currentServer;
+            if (!server || !authStore.user) return false;
+            return (server.ownerId === authStore.user.id) || (server.owner_id === authStore.user.id);
         }
     },
 

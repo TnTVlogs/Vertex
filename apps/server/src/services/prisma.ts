@@ -4,7 +4,7 @@ import mariadb from "mariadb";
 import dotenv from "dotenv";
 import path from "path";
 
-dotenv.config({ path: path.join(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const url = process.env.DATABASE_URL;
 
