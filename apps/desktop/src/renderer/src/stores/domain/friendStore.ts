@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { useAuthStore } from '../authStore';
 import { User } from '@shared/models';
 import { apiFetch } from '../../utils/api';
+import { ENV } from '../../utils/env';
 
 export const useFriendStore = defineStore('friend', {
     state: () => ({
@@ -16,7 +17,7 @@ export const useFriendStore = defineStore('friend', {
             try {
                 // We use standard fetch here to match existing behavior without rewriting everything to apiFetch yet,
                 // but the apiFetch could be easily swapped.
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/social/friends/${authStore.user.id}`);
+                const res = await fetch(`${ENV.API_URL}/social/friends/${authStore.user.id}`);
                 if (res.ok) {
                     this.friends = await res.json();
                 }
@@ -29,7 +30,7 @@ export const useFriendStore = defineStore('friend', {
             const authStore = useAuthStore();
             if (!authStore.user) return;
             try {
-                const url = `${import.meta.env.VITE_API_URL}/social/requests/${authStore.user.id}`;
+                const url = `${ENV.API_URL}/social/requests/${authStore.user.id}`;
                 const res = await fetch(url);
                 if (res.ok) {
                     this.friendRequests = await res.json();
@@ -41,7 +42,7 @@ export const useFriendStore = defineStore('friend', {
 
         async respondToRequest(requestId: string, status: 'accepted' | 'declined') {
             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/social/request/respond`, {
+                const res = await fetch(`${ENV.API_URL}/social/request/respond`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ requestId, status })

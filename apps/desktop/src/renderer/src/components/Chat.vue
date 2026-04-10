@@ -49,7 +49,21 @@
         </div>
       </div>
       
-      <div v-if="chatStore.sortedMessages.length === 0" class="flex-1 flex flex-col items-center justify-center pt-20 opacity-20">
+      <!-- Skeletons while loading -->
+      <div v-if="messageStore.isLoading" class="space-y-6">
+        <div v-for="i in 6" :key="i" 
+             class="flex items-end space-x-3 opacity-20 animate-pulse"
+             :class="i % 3 === 0 ? 'flex-row-reverse space-x-reverse' : 'flex-row'"
+        >
+          <div class="w-9 h-9 rounded-xl bg-white/20 shrink-0"></div>
+          <div class="flex flex-col space-y-2 w-1/2" :class="i % 3 === 0 ? 'items-end' : 'items-start'">
+            <div class="h-2 w-20 bg-white/20 rounded"></div>
+            <div class="h-10 w-full bg-white/20 rounded-2xl" :class="i % 3 === 0 ? 'rounded-br-sm' : 'rounded-bl-sm'"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div v-if="!messageStore.isLoading && chatStore.sortedMessages.length === 0" class="flex-1 flex flex-col items-center justify-center pt-20 opacity-20">
          <p class="text-xs font-black tracking-[0.3em] italic uppercase">{{ i18n.t('chat.no_logs') }}</p>
       </div>
     </div>
@@ -73,7 +87,7 @@
              @keydown.enter.prevent="handleSend"
              @input="handleInput"
              @paste="handlePaste"
-             class="flex-1 bg-transparent border-none outline-none px-4 py-2 text-sm font-medium text-[var(--v-text-primary)] tracking-wide overflow-y-auto max-h-32 min-h-[1.5em]"
+             class="flex-1 bg-transparent border-none outline-none px-4 py-2 text-sm font-medium text-[var(--v-text-primary)] tracking-wide overflow-y-auto max-h-32 min-h-[1.5em] select-text"
              :data-placeholder="i18n.t('chat.placeholder')"
            ></div>
            <div class="flex items-center pr-2 space-x-1">
@@ -100,6 +114,8 @@ import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useI18nStore } from '../stores/i18nStore'
+import { useServerStore } from '../stores/domain/serverStore'
+import { useMessageStore } from '../stores/domain/messageStore'
 import EmojiPicker from './EmojiPicker.vue'
 import { parseEmojis, getEmojiUrl } from '../utils/emoji'
 
@@ -107,6 +123,7 @@ const chatStore = useChatStore()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const i18n = useI18nStore()
+const messageStore = useMessageStore()
 const showEmojiPicker = ref(false)
 const messageContainer = ref<HTMLElement | null>(null)
 const chatInput = ref<HTMLElement | null>(null)
@@ -332,5 +349,13 @@ onMounted(() => {
 }
 .emoji-category-scroll::-webkit-scrollbar {
   display: none;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.1; }
+}
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 </style>

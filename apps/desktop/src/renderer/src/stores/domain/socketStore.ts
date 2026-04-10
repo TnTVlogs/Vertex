@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../authStore';
 import { Message } from '@shared/models';
+import { ENV } from '../../utils/env';
 
 export const useSocketStore = defineStore('socket', {
     state: () => ({
@@ -20,7 +21,7 @@ export const useSocketStore = defineStore('socket', {
         ) {
             const authStore = useAuthStore();
             if (!this.socket) {
-                this.socket = io(import.meta.env.VITE_SOCKET_URL, {
+                this.socket = io(ENV.SOCKET_URL, {
                     transports: ['websocket', 'polling']
                 });
 

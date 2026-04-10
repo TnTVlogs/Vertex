@@ -46,7 +46,6 @@ export function getEmojiUrl(emoji: string): string {
           code.charCodeAt(0) - 65 + 0x1f1e6,
           code.charCodeAt(1) - 65 + 0x1f1e6
         );
-        console.log(`[Emoji Debug] Dynamic flag resolution for ${emoji} -> ${unicode}`);
       }
     }
     

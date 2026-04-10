@@ -1,0 +1,213 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { useServerStore } from '../stores/domain/serverStore'
+import { useAuthStore } from '../stores/authStore'
+import { useI18nStore } from '../stores/i18nStore'
+
+const props = defineProps<{
+  show: boolean
+}>()
+
+const emit = defineEmits(['close'])
+
+const serverStore = useServerStore()
+const authStore = useAuthStore()
+const i18n = useI18nStore()
+
+const activeTab = ref<'overview' | 'channels' | 'members' | 'invites'>('overview')
+const serverNameConfirm = ref('')
+const newChannelName = ref('')
+const newChannelType = ref<'text' | 'voice'>('text')
+const editingChannelId = ref<string | null>(null)
+const editingChannelName = ref('')
+
+const currentServer = computed(() => serverStore.currentServer)
+const channels = computed(() => serverStore.channels)
+const inviteLink = computed(() => currentServer.value?.inviteCode ? `https://vertex.sergidalmau.dev/invite/${currentServer.value.inviteCode}` : '')
+
+async function handleDeleteServer() {
+  if (serverNameConfirm.value !== currentServer.value?.name) {
+    alert('Server name does not match')
+    return
+  }
+  const ok = await serverStore.deleteServer(currentServer.value.id)
+  if (ok) emit('close')
+}
+
+async function handleCreateChannel() {
+  if (!newChannelName.value) return
+  const ok = await serverStore.createChannel(currentServer.value.id, newChannelName.value, newChannelType.value)
+  if (ok) {
+    newChannelName.value = ''
+    newChannelType.value = 'text'
+  }
+}
+
+async function handleUpdateChannel(channelId: string) {
+  const ok = await serverStore.updateChannel(currentServer.value.id, channelId, editingChannelName.value)
+  if (ok) editingChannelId.value = null
+}
+
+async function handleDeleteChannel(channelId: string) {
+  if (confirm('Are you sure you want to delete this channel?')) {
+    await serverStore.deleteChannel(currentServer.value.id, channelId)
+  }
+}
+
+async function handleGenerateInvite() {
+  await serverStore.generateInvite(currentServer.value.id)
+}
+
+async function handleRevokeInvite() {
+  await serverStore.revokeInvite(currentServer.value.id)
+}
+
+function copyInvite() {
+  navigator.clipboard.writeText(inviteLink.value)
+  alert('Link copied to clipboard!')
+}
+
+async function handleKick(userId: string) {
+  if (confirm('Are you sure you want to kick this member?')) {
+    await serverStore.kickMember(currentServer.value.id, userId)
+    // Optionally refresh members list if we had one in state
+  }
+}
+</script>
+
+<template>
+  <div v-if="show" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+    <div class="bg-[var(--v-bg-base)] border border-[var(--v-border)] w-full max-w-4xl h-[600px] rounded-3xl shadow-2xl flex overflow-hidden">
+      <!-- Sidebar -->
+      <aside class="w-64 bg-[var(--v-bg-sidebar)] border-r border-[var(--v-border)] p-6 flex flex-col">
+        <h2 class="text-xs font-black uppercase tracking-[0.2em] text-[var(--v-text-secondary)] mb-6 opacity-50">Settings</h2>
+        <nav class="flex-1 space-y-2">
+          <button 
+            v-for="tab in (['overview', 'channels', 'members', 'invites'] as const)" 
+            :key="tab"
+            @click="activeTab = tab"
+            class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold transition-all uppercase tracking-wider"
+            :class="activeTab === tab ? 'bg-[var(--v-accent)] text-[var(--v-bg-base)] shadow-lg' : 'text-[var(--v-text-secondary)] hover:bg-white/5 hover:text-white'"
+          >
+            {{ tab }}
+          </button>
+        </nav>
+        <button @click="emit('close')" class="mt-auto px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold uppercase tracking-widest text-[var(--v-text-secondary)] transition-all">
+          Close Settings
+        </button>
+      </aside>
+
+      <!-- Content -->
+      <main class="flex-1 p-10 overflow-y-auto no-scrollbar relative">
+        <!-- Overview -->
+        <section v-if="activeTab === 'overview'" class="space-y-10 animate-in slide-in-from-right-4 duration-500">
+          <div>
+            <h1 class="text-3xl font-black text-white mb-2 uppercase italic tracking-tighter">Server Overview</h1>
+            <p class="text-[var(--v-text-secondary)] text-sm font-medium">Manage the core identity of your communication node.</p>
+          </div>
+
+          <div class="p-6 rounded-2xl bg-red-500/5 border border-red-500/20 space-y-4">
+             <h3 class="text-red-500 font-black text-xs uppercase tracking-widest">Danger Zone</h3>
+             <p class="text-xs text-[var(--v-text-secondary)]">Once you delete a server, there is no going back. Please be certain.</p>
+             <div class="space-y-2">
+               <label class="text-[10px] font-bold uppercase text-[var(--v-text-secondary)]">TYPE "{{ currentServer?.name }}" TO CONFIRM</label>
+               <input v-model="serverNameConfirm" type="text" class="w-full bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl px-4 py-2 text-sm outline-none focus:border-red-500 transition-all" />
+             </div>
+             <button @click="handleDeleteServer" class="w-full py-3 bg-red-500 text-white font-black text-xs uppercase rounded-xl hover:bg-red-600 transition-all shadow-lg shadow-red-500/20">
+               Permanently Delete Server
+             </button>
+          </div>
+        </section>
+
+        <!-- Channels -->
+        <section v-if="activeTab === 'channels'" class="space-y-8 animate-in slide-in-from-right-4 duration-500">
+          <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-black text-white uppercase italic tracking-tighter">Frequencies</h1>
+            <div class="flex space-x-2">
+               <input v-model="newChannelName" placeholder="New Channel Name" class="bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl px-4 py-2 text-xs outline-none" />
+               <select v-model="newChannelType" class="bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl px-2 py-2 text-xs outline-none">
+                 <option value="text">TEXT</option>
+                 <option value="voice">VOICE</option>
+               </select>
+               <button @click="handleCreateChannel" class="px-4 py-2 bg-[var(--v-accent)] text-[var(--v-bg-base)] font-black text-[10px] rounded-xl uppercase">Create</button>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <div v-for="channel in channels" :key="channel.id" class="flex items-center justify-between p-4 bg-[var(--v-bg-surface)]/50 rounded-2xl border border-[var(--v-border)] group">
+              <div class="flex items-center space-x-3">
+                <span class="text-[var(--v-text-secondary)] font-mono opacity-50">#</span>
+                <input v-if="editingChannelId === channel.id" v-model="editingChannelName" class="bg-transparent border-b border-[var(--v-accent)] outline-none text-sm font-bold text-white px-1" />
+                <span v-else class="text-sm font-black text-white">{{ channel.name }}</span>
+                <span class="text-[8px] font-black uppercase text-[var(--v-text-secondary)] px-1.5 py-0.5 bg-white/5 rounded">{{ channel.type }}</span>
+              </div>
+              <div class="flex space-x-2 opacity-0 group-hover:opacity-100 transition-all">
+                <button v-if="editingChannelId === channel.id" @click="handleUpdateChannel(channel.id)" class="p-2 text-[var(--v-accent)] hover:scale-110"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></button>
+                <button v-else @click="editingChannelId = channel.id; editingChannelName = channel.name" class="p-2 text-[var(--v-text-secondary)] hover:text-white"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
+                <button @click="handleDeleteChannel(channel.id)" class="p-2 text-red-500 hover:scale-110"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Members -->
+        <section v-if="activeTab === 'members'" class="space-y-8 animate-in slide-in-from-right-4 duration-500">
+           <h1 class="text-2xl font-black text-white uppercase italic tracking-tighter">Authorized Entities</h1>
+           <div class="space-y-3">
+             <div v-for="member in currentServer?.members" :key="member.id" class="flex items-center justify-between p-4 bg-[var(--v-bg-surface)]/50 rounded-2xl border border-[var(--v-border)]">
+               <div class="flex items-center space-x-4">
+                 <div class="w-10 h-10 rounded-xl bg-[var(--v-bg-surface)] border border-[var(--v-border)] flex items-center justify-center font-black">
+                   {{ member.user.username.charAt(0).toUpperCase() }}
+                 </div>
+                 <div class="flex flex-col">
+                   <span class="text-sm font-black text-white">{{ member.user.username }}</span>
+                   <span class="text-[8px] font-black uppercase text-[var(--v-accent)]">{{ member.role }}</span>
+                 </div>
+               </div>
+               <div v-if="member.user.id !== authStore.user?.id" class="flex space-x-2">
+                 <button @click="handleKick(member.user.id)" class="px-4 py-2 bg-red-500/10 text-red-500 text-[10px] font-black uppercase rounded-xl hover:bg-red-500 hover:text-white transition-all">Kick Entity</button>
+               </div>
+             </div>
+           </div>
+        </section>
+
+        <!-- Invites -->
+        <section v-if="activeTab === 'invites'" class="space-y-8 animate-in slide-in-from-right-4 duration-500">
+          <h1 class="text-2xl font-black text-white uppercase italic tracking-tighter">Access Protocols</h1>
+          
+          <div class="p-8 rounded-3xl bg-[var(--v-bg-sidebar)] border border-[var(--v-border)] flex flex-col items-center text-center space-y-6">
+            <div class="w-16 h-16 rounded-2xl vertex-gradient flex items-center justify-center text-[var(--v-bg-base)] shadow-xl">
+               <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+            </div>
+            
+            <div v-if="currentServer?.inviteCode" class="w-full space-y-4">
+               <p class="text-xs font-bold text-[var(--v-text-secondary)] uppercase tracking-[0.2em]">Active Uplink Path</p>
+               <div class="flex items-center bg-[var(--v-bg-surface)] p-2 rounded-2xl border border-[var(--v-border)]">
+                 <span class="flex-1 px-4 text-sm font-mono text-[var(--v-accent)] truncate">{{ inviteLink }}</span>
+                 <button @click="copyInvite" class="px-4 py-2 bg-[var(--v-accent)] text-[var(--v-bg-base)] font-black text-[10px] rounded-xl uppercase shadow-lg">Copy</button>
+               </div>
+               <button @click="handleRevokeInvite" class="text-[10px] font-black uppercase text-red-500 hover:underline">Revoke and Terminate Link</button>
+            </div>
+
+            <div v-else class="space-y-4">
+               <p class="text-xs text-[var(--v-text-secondary)]">No active invitation protocol found for this server.</p>
+               <button @click="handleGenerateInvite" class="px-8 py-3 bg-[var(--v-accent)] text-[var(--v-bg-base)] font-black text-xs rounded-2xl uppercase shadow-xl hover:scale-105 active:scale-95 transition-all">
+                 Initialize Invitation Protocol
+               </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+</style>

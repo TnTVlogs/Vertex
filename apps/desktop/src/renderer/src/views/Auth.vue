@@ -88,6 +88,7 @@
 import { ref } from 'vue'
 import { useAuthStore } from '../stores/authStore'
 import { useI18nStore } from '../stores/i18nStore'
+import { ENV } from '../utils/env'
 import pkg from '../../../../package.json'
 
 const authStore = useAuthStore()
@@ -105,7 +106,7 @@ async function handleSubmit() {
     if (isLogin.value) {
       await authStore.login(email.value, password.value)
     } else {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/register`, {
+      const response = await fetch(`${ENV.API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.value, email: email.value, password: password.value })

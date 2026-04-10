@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { User } from '@shared/models'
+import { ENV } from '../utils/env'
 
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null)
@@ -14,7 +15,7 @@ export const useAuthStore = defineStore('auth', () => {
             const refreshToken = await window.api.getRefreshToken()
             if (!refreshToken || !user.value?.id) return false
 
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/refresh`, {
+            const res = await fetch(`${ENV.API_URL}/auth/refresh`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ refreshToken, userId: user.value.id })
@@ -55,7 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
         token.value = savedToken
 
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
+            const res = await fetch(`${ENV.API_URL}/auth/me`, {
                 headers: { Authorization: `Bearer ${token.value}` }
             })
 
@@ -86,7 +87,7 @@ export const useAuthStore = defineStore('auth', () => {
                 return
             }
 
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/refresh`, {
+            const res = await fetch(`${ENV.API_URL}/auth/refresh`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ refreshToken, userId: savedUserId })
@@ -101,7 +102,7 @@ export const useAuthStore = defineStore('auth', () => {
             token.value = accessToken
             await window.api.saveToken(accessToken)
 
-            const meRes = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
+            const meRes = await fetch(`${ENV.API_URL}/auth/me`, {
                 headers: { Authorization: `Bearer ${accessToken}` }
             })
 
@@ -119,7 +120,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // ── LOGIN ─────────────────────────────────────────────────────────────────
     async function login(email: string, password: string) {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
+        const response = await fetch(`${ENV.API_URL}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
@@ -154,7 +155,7 @@ export const useAuthStore = defineStore('auth', () => {
     async function logout() {
         if (user.value?.id) {
             try {
-                await fetch(`${import.meta.env.VITE_API_URL}/auth/logout`, {
+                await fetch(`${ENV.API_URL}/auth/logout`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId: user.value.id })

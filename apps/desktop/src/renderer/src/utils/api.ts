@@ -11,8 +11,9 @@
  */
 
 import { useAuthStore } from '../stores/authStore'
+import { ENV } from './env'
 
-const BASE_URL = import.meta.env.VITE_API_URL as string
+const BASE_URL = ENV.API_URL
 
 export async function apiFetch(
     path: string,

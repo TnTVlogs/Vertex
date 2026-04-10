@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia';
 import { useAuthStore } from '../authStore';
 import { Message } from '@shared/models';
+import { ENV } from '../../utils/env';
 
 export const useMessageStore = defineStore('message', {
     state: () => ({
         messages: [] as Message[],
+        isLoading: false,
     }),
 
     getters: {
@@ -21,8 +23,9 @@ export const useMessageStore = defineStore('message', {
         async fetchMessages(targetId: string, type: 'channel' | 'dm') {
             const authStore = useAuthStore();
             if (!authStore.user) return;
+            this.isLoading = true;
             try {
-                const url = new URL(`${import.meta.env.VITE_API_URL}/messages/${targetId}`);
+                const url = new URL(`${ENV.API_URL}/messages/${targetId}`);
                 url.searchParams.append('type', type);
                 url.searchParams.append('userId', authStore.user.id);
 
@@ -32,6 +35,8 @@ export const useMessageStore = defineStore('message', {
                 }
             } catch (e) {
                 console.error('Error fetching messages:', e);
+            } finally {
+                this.isLoading = false;
             }
         },
 

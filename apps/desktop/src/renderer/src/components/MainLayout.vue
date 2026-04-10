@@ -2,20 +2,25 @@
 import { useAuthStore } from '../stores/authStore'
 import { useNavigationStore } from '../stores/navigationStore'
 import { useChatStore } from '../stores/chatStore'
+import { useServerStore } from '../stores/domain/serverStore'
 import { useI18nStore } from '../stores/i18nStore'
+import { ENV } from '../utils/env'
 import { onMounted, ref, computed } from 'vue'
 import Chat from '../components/Chat.vue'
 import Modal from '../components/Modal.vue'
 import Settings from '../components/Settings.vue'
+import ServerSettingsModal from '../components/ServerSettingsModal.vue'
 
 const authStore = useAuthStore()
 const navStore = useNavigationStore()
 const chatStore = useChatStore()
+const serverStore = useServerStore()
 const i18n = useI18nStore()
 
 const friendsTab = ref<'online' | 'all' | 'pending'>('online')
 const showAddFriendModal = ref(false)
 const showCreateServerModal = ref(false)
+const showServerSettingsModal = ref(false)
 
 const filteredFriends = computed(() => {
   const allFriends = chatStore.friends ?? []
@@ -25,19 +30,57 @@ const filteredFriends = computed(() => {
   return allFriends
 })
 
-// Sync both stores on navigation
+// Persistence: save last visited channel per server
+const LAST_CHANNELS_KEY = 'vertex_last_visited_channels'
+
+function saveLastChannel(serverId: string, channelId: string) {
+  const data = JSON.parse(localStorage.getItem(LAST_CHANNELS_KEY) || '{}')
+  data[serverId] = channelId
+  localStorage.setItem(LAST_CHANNELS_KEY, JSON.stringify(data))
+}
+
+function getLastChannel(serverId: string): string | null {
+  const data = JSON.parse(localStorage.getItem(LAST_CHANNELS_KEY) || '{}')
+  return data[serverId] || null
+}
+
+// Sync store on navigation
 function openDM(recipientId: string) {
   navStore.setDM(recipientId)
-  chatStore.activeChannelId = null
-  chatStore.activeRecipientId = recipientId
   chatStore.clearMessages()
 }
 
 function openChannel(serverId: string, channelId: string) {
+  // Only skip if already in this channel AND in server view
+  if (navStore.activeChannelId === channelId && navStore.activeView === 'server') return
+  
   navStore.setServer(serverId, channelId)
-  chatStore.activeChannelId = channelId
-  chatStore.activeRecipientId = null
   chatStore.clearMessages()
+  
+  saveLastChannel(serverId, channelId)
+}
+
+async function handleServerClick(serverId: string) {
+  const lastId = getLastChannel(serverId)
+  
+  // If we have a history, jump immediately to avoid flicker
+  if (lastId) {
+    openChannel(serverId, lastId)
+    // Refresh channels in background
+    chatStore.fetchChannels(serverId)
+    return
+  }
+
+  // If no history, we must fetch first to find the first channel
+  await chatStore.fetchChannels(serverId)
+  const channels = chatStore.channels
+  
+  if (channels && channels.length > 0) {
+    openChannel(serverId, channels[0].id)
+  } else {
+    // If no channels, still set the server so the sidebar highlights
+    navStore.setServer(serverId)
+  }
 }
 
 onMounted(async () => {
@@ -56,7 +99,7 @@ const handleLogout = () => {
 
 const onAddFriend = async (username: string) => {
   if (!username) return
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/social/request`, {
+  const res = await fetch(`${ENV.API_URL}/social/request`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ fromId: authStore.user?.id, toUsername: username })
@@ -73,7 +116,7 @@ const onAddFriend = async (username: string) => {
 
 const onCreateServer = async (name: string) => {
   if (!name) return
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/servers/create`, {
+  const res = await fetch(`${ENV.API_URL}/servers/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, ownerId: authStore.user?.id })
@@ -102,7 +145,7 @@ const onCreateServer = async (name: string) => {
 
       <div class="flex flex-col items-center space-y-4 flex-1 overflow-y-auto no-scrollbar w-full">
         <div v-for="server in chatStore.servers" :key="server.id"
-             @click="navStore.setServer(server.id); chatStore.fetchChannels(server.id)"
+             @click="handleServerClick(server.id)"
              class="group relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300 cursor-pointer overflow-hidden border border-transparent shadow-lg"
              :class="navStore.activeServerId === server.id ? 'border-[var(--v-accent)] bg-[var(--v-bg-surface)] scale-110' : 'bg-[var(--v-bg-surface)] hover:scale-105'"
         >
@@ -248,6 +291,9 @@ const onCreateServer = async (name: string) => {
             </h2>
           </div>
           <div class="flex items-center space-x-4">
+             <button v-if="serverStore.isOwner" @click="showServerSettingsModal = true" class="text-[var(--v-text-secondary)] hover:text-[var(--v-accent)] transition-colors">
+               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+             </button>
              <button class="text-[var(--v-text-secondary)] hover:text-white"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg></button>
           </div>
         </div>
@@ -372,6 +418,11 @@ const onCreateServer = async (name: string) => {
         <p class="text-[var(--v-text-secondary)] text-center text-xs mb-6 font-bold uppercase tracking-widest">Connect to another user endpoint.</p>
       </template>
     </Modal>
+
+    <ServerSettingsModal 
+      :show="showServerSettingsModal" 
+      @close="showServerSettingsModal = false"
+    />
   </div>
 </template>
 

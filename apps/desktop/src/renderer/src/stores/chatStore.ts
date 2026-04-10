@@ -4,13 +4,16 @@ import { useFriendStore } from './domain/friendStore';
 import { useServerStore } from './domain/serverStore';
 import { useMessageStore } from './domain/messageStore';
 
+import { useNavigationStore } from './navigationStore';
+
 export const useChatStore = defineStore('chat', {
     state: () => ({
-        activeChannelId: null as string | null,
-        activeRecipientId: null as string | null,
+        // State moved to navigationStore for single source of truth
     }),
 
     getters: {
+        activeChannelId: () => useNavigationStore().activeChannelId,
+        activeRecipientId: () => useNavigationStore().activeRecipientId,
         messages: () => useMessageStore().messages,
         sortedMessages: () => useMessageStore().sortedMessages,
         friends: () => useFriendStore().friends,

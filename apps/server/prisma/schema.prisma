@@ -1,4 +1,4 @@
-﻿generator client {
+generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
@@ -54,10 +54,11 @@ model Friendship {
 }
 
 model Server {
-  id        String    @id @default(uuid())
-  name      String
-  iconUrl   String?   @map("icon_url")
-  ownerId   String    @map("owner_id")
+  id          String    @id @default(uuid())
+  name        String
+  iconUrl     String?   @map("icon_url")
+  ownerId     String    @map("owner_id")
+  inviteCode  String?   @unique @map("invite_code")
   
   owner     User      @relation("ServerOwner", fields: [ownerId], references: [id])
   channels  Channel[]
@@ -72,7 +73,7 @@ model Channel {
   name      String
   type      String    @default("text")
 
-  server    Server    @relation(fields: [serverId], references: [id])
+  server    Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
   messages  Message[]
 
   @@map("channels")
@@ -84,7 +85,7 @@ model Member {
   userId    String    @map("user_id")
   role      String    @default("member")
   
-  server    Server    @relation(fields: [serverId], references: [id])
+  server    Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id])
 
   @@unique([serverId, userId])
@@ -101,7 +102,7 @@ model Message {
   createdAt     DateTime  @default(now()) @map("created_at")
 
   author      User      @relation("MessageAuthor", fields: [authorId], references: [id])
-  channel     Channel?  @relation(fields: [channelId], references: [id])
+  channel     Channel?  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   recipient   User?     @relation("MessageRecipient", fields: [recipientId], references: [id])
 
   @@map("messages")
