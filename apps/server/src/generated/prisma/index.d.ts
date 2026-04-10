@@ -289,8 +289,8 @@ export namespace Prisma {
   export import Exact = $Public.Exact
 
   /**
-   * Prisma Client JS version: 7.4.2
-   * Query Engine version: 94a226be1cf2967af2541cca5529f0f7ba866919
+   * Prisma Client JS version: 7.7.0
+   * Query Engine version: 75cbdc1eb7150937890ad5465d861175c6624711
    */
   export type PrismaVersion = {
     client: string
@@ -2325,6 +2325,11 @@ export namespace Prisma {
      * Skip the first `n` Users.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Users.
+     */
     distinct?: UserScalarFieldEnum | UserScalarFieldEnum[]
   }
 
@@ -3439,6 +3444,11 @@ export namespace Prisma {
      * Skip the first `n` FriendRequests.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of FriendRequests.
+     */
     distinct?: FriendRequestScalarFieldEnum | FriendRequestScalarFieldEnum[]
   }
 
@@ -4350,6 +4360,11 @@ export namespace Prisma {
      * Skip the first `n` Friendships.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Friendships.
+     */
     distinct?: FriendshipScalarFieldEnum | FriendshipScalarFieldEnum[]
   }
 
@@ -5289,6 +5304,11 @@ export namespace Prisma {
      * Skip the first `n` Servers.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Servers.
+     */
     distinct?: ServerScalarFieldEnum | ServerScalarFieldEnum[]
   }
 
@@ -6261,6 +6281,11 @@ export namespace Prisma {
      * Skip the first `n` Channels.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Channels.
+     */
     distinct?: ChannelScalarFieldEnum | ChannelScalarFieldEnum[]
   }
 
@@ -7207,6 +7232,11 @@ export namespace Prisma {
      * Skip the first `n` Members.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Members.
+     */
     distinct?: MemberScalarFieldEnum | MemberScalarFieldEnum[]
   }
 
@@ -8166,6 +8196,11 @@ export namespace Prisma {
      * Skip the first `n` Messages.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Messages.
+     */
     distinct?: MessageScalarFieldEnum | MessageScalarFieldEnum[]
   }
 
