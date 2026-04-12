@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { User } from '@shared/models'
 import { ENV } from '../utils/env'
+import { SecureStorage } from '../utils/environment'
 
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null)
@@ -12,7 +13,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Retorna true si ha tingut èxit, false si ha fallat (sessió expirada).
     async function refreshAccessToken(): Promise<boolean> {
         try {
-            const refreshToken = await window.api.getRefreshToken()
+            const refreshToken = await SecureStorage.getRefreshToken()
             if (!refreshToken || !user.value?.id) return false
 
             const res = await fetch(`${ENV.API_URL}/auth/refresh`, {
@@ -28,7 +29,7 @@ export const useAuthStore = defineStore('auth', () => {
 
             const data = await res.json()
             token.value = data.accessToken
-            await window.api.saveToken(data.accessToken)
+            await SecureStorage.saveToken(data.accessToken)
             return true
         } catch (e) {
             console.error('refreshAccessToken failed:', e)
@@ -46,7 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
             localStorage.removeItem('token')
         }
 
-        const savedToken = await window.api.loadToken()
+        const savedToken = await SecureStorage.loadToken()
 
         if (!savedToken) {
             await tryBootstrapFromRefresh()
@@ -78,7 +79,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Usat en l'arrencada quan no tenim user.id encara.
     async function tryBootstrapFromRefresh() {
         try {
-            const refreshToken = await window.api.getRefreshToken()
+            const refreshToken = await SecureStorage.getRefreshToken()
             if (!refreshToken) return
 
             const savedUserId = localStorage.getItem('vertex_uid')
@@ -100,7 +101,7 @@ export const useAuthStore = defineStore('auth', () => {
 
             const { accessToken } = await res.json()
             token.value = accessToken
-            await window.api.saveToken(accessToken)
+            await SecureStorage.saveToken(accessToken)
 
             const meRes = await fetch(`${ENV.API_URL}/auth/me`, {
                 headers: { Authorization: `Bearer ${accessToken}` }
@@ -139,12 +140,12 @@ export const useAuthStore = defineStore('auth', () => {
 
         token.value = accessToken
 
-        // Guardar access token encriptat
-        await window.api.saveToken(accessToken)
+        // Guardar access token encriptat o web pass
+        await SecureStorage.saveToken(accessToken)
 
         // Guardar refresh token encriptat (només si el servidor el retorna)
         if (refreshToken) {
-            await window.api.saveRefreshToken(refreshToken)
+            await SecureStorage.saveRefreshToken(refreshToken)
         }
 
         // Guardar userId per poder fer bootstrap sense credencials
@@ -172,8 +173,8 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = null
         token.value = null
         localStorage.removeItem('vertex_uid')
-        await window.api.clearToken()
-        await window.api.clearRefreshToken()
+        await SecureStorage.clearToken()
+        await SecureStorage.clearRefreshToken()
     }
 
     return { user, token, login, logout, init, refreshAccessToken }
