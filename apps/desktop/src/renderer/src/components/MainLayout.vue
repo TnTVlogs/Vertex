@@ -4,6 +4,7 @@ import { useNavigationStore } from '../stores/navigationStore'
 import { useChatStore } from '../stores/chatStore'
 import { useServerStore } from '../stores/domain/serverStore'
 import { useI18nStore } from '../stores/i18nStore'
+import { useToastStore } from '../stores/toastStore'
 import { ENV } from '../utils/env'
 import { onMounted, ref, computed } from 'vue'
 import Chat from '../components/Chat.vue'
@@ -16,6 +17,7 @@ const navStore = useNavigationStore()
 const chatStore = useChatStore()
 const serverStore = useServerStore()
 const i18n = useI18nStore()
+const toastStore = useToastStore()
 
 const friendsTab = ref<'online' | 'all' | 'pending'>('online')
 const showAddFriendModal = ref(false)
@@ -107,11 +109,12 @@ const onAddFriend = async (username: string) => {
   })
   if (res.ok) {
     showAddFriendModal.value = false
+    toastStore.addToast('Uplink request transmitted successfully', 'success')
     // Refresh pending list for both sender state and display
     if (typeof chatStore.fetchRequests === 'function') await chatStore.fetchRequests()
   } else {
     const data = await res.json()
-    alert(data.error || 'Failed to send request')
+    toastStore.addToast(data.error || 'Failed to send request', 'error')
   }
 }
 
@@ -130,15 +133,19 @@ const onServerAction = async (value: string) => {
     if (res.ok) {
       await chatStore.fetchServers()
       showCreateServerModal.value = false
+      toastStore.addToast('Communication node initialized', 'success')
+    } else {
+      toastStore.addToast('Failed to initialize node', 'error')
     }
   } else {
     try {
       const ok = await serverStore.joinServer(value)
       if (ok) {
         showCreateServerModal.value = false
+        // The store handles the success toast
       }
     } catch (e: any) {
-      alert(e.message)
+      // The store handles the error toast
     }
   }
 }

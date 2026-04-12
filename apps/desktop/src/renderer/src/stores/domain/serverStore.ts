@@ -146,10 +146,23 @@ export const useServerStore = defineStore('server', {
             return res.ok;
         },
 
-        async joinServer(inviteCode: string) {
+        async joinServer(inviteInput: string) {
             const authStore = useAuthStore();
+            const { useToastStore } = await import('../toastStore'); // dynamic import to avoid circular dependency issues at boot
+            const toastStore = useToastStore();
+
             if (!authStore.user) return false;
             
+            // Link Normalization: Extract the pure code whether it's a URL or just a code
+            let inviteCode = inviteInput.trim();
+            const match = inviteCode.match(/\/invite\/([a-zA-Z0-9]+)$/);
+            if (match) {
+                inviteCode = match[1];
+            } else if (inviteCode.includes('/')) {
+                // Failsafe: if it's a messy URL, grab the last part
+                inviteCode = inviteCode.split('/').pop() || inviteCode;
+            }
+
             const res = await fetch(`${ENV.API_URL}/servers/join`, {
                 method: 'POST',
                 headers: { 
@@ -161,9 +174,11 @@ export const useServerStore = defineStore('server', {
 
             if (res.ok) {
                 await this.fetchServers();
+                toastStore.addToast(`Successfully connected via code [${inviteCode}]`, 'success');
                 return true;
             } else {
                 const data = await res.json();
+                toastStore.addToast(data.error || 'Failed to join server', 'error');
                 throw new Error(data.error || 'Failed to join server');
             }
         }

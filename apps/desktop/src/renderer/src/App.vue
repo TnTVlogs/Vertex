@@ -2,6 +2,7 @@
 import MainLayout from './components/MainLayout.vue'
 import Auth from './views/Auth.vue'
 import Splash from './views/Splash.vue'
+import ToastContainer from './components/ToastContainer.vue'
 import { useAuthStore } from './stores/authStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { onMounted, ref } from 'vue'
@@ -32,4 +33,6 @@ onMounted(async () => {
     <MainLayout v-if="authStore.user" />
     <Auth v-else />
   </template>
+  
+  <ToastContainer />
 </template>

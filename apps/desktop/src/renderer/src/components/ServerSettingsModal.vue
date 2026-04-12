@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useServerStore } from '../stores/domain/serverStore'
 import { useAuthStore } from '../stores/authStore'
 import { useI18nStore } from '../stores/i18nStore'
+import { useToastStore } from '../stores/toastStore'
 
 const props = defineProps<{
   show: boolean
@@ -13,6 +14,7 @@ const emit = defineEmits(['close'])
 const serverStore = useServerStore()
 const authStore = useAuthStore()
 const i18n = useI18nStore()
+const toastStore = useToastStore()
 
 const activeTab = ref<'overview' | 'channels' | 'members' | 'invites'>('overview')
 const serverNameConfirm = ref('')
@@ -41,6 +43,7 @@ async function handleCreateChannel() {
   if (ok) {
     newChannelName.value = ''
     newChannelType.value = 'text'
+    toastStore.addToast('Frequency channel established', 'success')
   }
 }
 
@@ -57,16 +60,18 @@ async function handleDeleteChannel(channelId: string) {
 
 async function handleGenerateInvite() {
   await serverStore.generateInvite(currentServer.value.id)
+  toastStore.addToast('New uplink matrix generated', 'success')
 }
 
 async function handleRevokeInvite() {
   await serverStore.revokeInvite(currentServer.value.id)
+  toastStore.addToast('Uplink matrix revoked securely', 'info')
 }
 
 function copyInvite() {
   if (!inviteLink.value) return
   navigator.clipboard.writeText(inviteLink.value)
-  alert('Link copied to clipboard!')
+  toastStore.addToast('Uplink identifier copied to clipboard', 'success')
 }
 
 async function handleKick(userId: string) {

@@ -13,10 +13,10 @@
             <slot name="label"></slot>
           </label>
           <input 
+            ref="inputRef"
             v-model="inputValue"
             @keyup.enter="handleConfirm"
-            class="w-full bg-[var(--v-bg-base)] border border-[var(--v-border)] rounded-2xl px-5 py-3.5 text-sm font-medium focus:border-[var(--v-accent)] outline-none transition-all text-white placeholder-white/20"
-            autofocus
+            class="w-full bg-[var(--v-bg-base)] border border-[var(--v-border)] rounded-2xl px-5 py-3.5 text-sm font-medium focus:border-[var(--v-accent)] outline-none transition-all text-white placeholder-white/20 custom-caret"
             placeholder="INPUT_VAL_01"
           />
         </div>
@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 
 const props = defineProps<{
   title: string
@@ -48,14 +48,29 @@ const props = defineProps<{
 const emit = defineEmits(['close', 'confirm'])
 
 const inputValue = ref('')
+const inputRef = ref<HTMLInputElement | null>(null)
+
+watch(() => props.show, async (newVal) => {
+  if (newVal) {
+    inputValue.value = '' // Reset when showing
+    await nextTick()
+    if (inputRef.value) {
+      inputRef.value.focus()
+    }
+  }
+})
 
 const handleConfirm = () => {
   if (inputValue.value.trim()) {
     emit('confirm', inputValue.value)
-    inputValue.value = ''
+    // We do not clear it here because we might need persistence before the parent closes it
   }
 }
 </script>
 
 <style scoped>
+/* Always ensure a visible caret color */
+.custom-caret {
+  caret-color: var(--v-accent);
+}
 </style>
