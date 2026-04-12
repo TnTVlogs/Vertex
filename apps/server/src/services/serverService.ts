@@ -1,44 +1,70 @@
-import db from './db';
-import { v4 as uuidv4 } from 'uuid';
+import prisma from './prisma';
 
 export const serverService = {
-    async createServer(name: string, ownerId: string): Promise<{ id: string; name: string; generalChannelId: string }> {
-        const serverId = uuidv4();
-        await db.query(
-            'INSERT INTO servers (id, name, owner_id) VALUES (?, ?, ?)',
-            [serverId, name, ownerId]
-        );
+    async createServer(name: string, ownerId: string) {
+        // We do this in a transaction to ensure all core bits are created
+        return prisma.$transaction(async (tx) => {
+            const server = await tx.server.create({
+                data: {
+                    name,
+                    ownerId,
+                    members: {
+                        create: {
+                            userId: ownerId,
+                            role: 'owner'
+                        }
+                    },
+                    channels: {
+                        create: {
+                            name: 'general',
+                            type: 'text'
+                        }
+                    }
+                },
+                include: {
+                    channels: true
+                }
+            });
 
-        // Add owner as member
-        const memberId = uuidv4();
-        await db.query(
-            'INSERT INTO members (id, server_id, user_id, role) VALUES (?, ?, ?, "owner")',
-            [memberId, serverId, ownerId]
-        );
-
-        // Create default general channel
-        const channelId = uuidv4();
-        await db.query(
-            'INSERT INTO channels (id, server_id, name) VALUES (?, ?, "general")',
-            [channelId, serverId]
-        );
-
-        return { id: serverId, name, generalChannelId: channelId };
+            return {
+                id: server.id,
+                name: server.name,
+                generalChannelId: server.channels[0].id
+            };
+        });
     },
 
-    async getServersForUser(userId: string): Promise<any[]> {
-        const [rows]: any = await db.query(
-            `SELECT s.* 
-             FROM servers s
-             JOIN members m ON s.id = m.server_id
-             WHERE m.user_id = ?`,
-            [userId]
-        );
-        return rows;
+    async getServersForUser(userId: string) {
+        // Fetch servers where user is a member, including detailed relations
+        return prisma.server.findMany({
+            where: {
+                members: {
+                    some: {
+                        userId: userId
+                    }
+                }
+            },
+            include: {
+                channels: true,
+                members: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                username: true,
+                                avatarUrl: true,
+                                status: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
     },
 
-    async getChannelsForServer(serverId: string): Promise<any[]> {
-        const [rows]: any = await db.query('SELECT * FROM channels WHERE server_id = ?', [serverId]);
-        return rows;
+    async getChannelsForServer(serverId: string) {
+        return prisma.channel.findMany({
+            where: { serverId }
+        });
     }
 };

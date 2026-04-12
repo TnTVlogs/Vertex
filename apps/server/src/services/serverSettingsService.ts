@@ -1,5 +1,4 @@
 import prisma from './prisma';
-import { v4 as uuidv4 } from 'uuid';
 
 export const serverSettingsService = {
     async createChannel(serverId: string, name: string, type: string = 'text') {
@@ -26,7 +25,13 @@ export const serverSettingsService = {
     },
 
     async generateInvite(serverId: string) {
-        const inviteCode = uuidv4().slice(0, 8); // Short 8-char code
+        // Generate a 5-character alphanumeric lowercase code (a-z0-9)
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let inviteCode = '';
+        for (let i = 0; i < 5; i++) {
+            inviteCode += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
         return prisma.server.update({
             where: { id: serverId },
             data: { inviteCode }
@@ -52,12 +57,35 @@ export const serverSettingsService = {
     },
 
     async transferOwnership(serverId: string, newOwnerId: string) {
-        return prisma.$transaction([
-            prisma.server.update({
+        // We use a transaction to swap ownerId and roles atomically
+        return prisma.$transaction(async (tx) => {
+            const server = await tx.server.findUnique({
+                where: { id: serverId },
+                select: { ownerId: true }
+            });
+
+            if (!server) throw new Error('Server not found');
+            const oldOwnerId = server.ownerId;
+
+            // 1. Update server ownerId
+            await tx.server.update({
                 where: { id: serverId },
                 data: { ownerId: newOwnerId }
-            }),
-            prisma.member.update({
+            });
+
+            // 2. Change old owner's role to 'member'
+            await tx.member.update({
+                where: {
+                    serverId_userId: {
+                        serverId,
+                        userId: oldOwnerId
+                    }
+                },
+                data: { role: 'member' }
+            });
+
+            // 3. Change new owner's role to 'owner'
+            await tx.member.update({
                 where: {
                     serverId_userId: {
                         serverId,
@@ -65,13 +93,15 @@ export const serverSettingsService = {
                     }
                 },
                 data: { role: 'owner' }
-            })
-            // Option: current owner becomes regular member or keeps some role
-        ]);
+            });
+
+            return { message: 'Success' };
+        });
     },
 
     async deleteServer(serverId: string) {
-        // Cascade delete is handled by the database/Prisma schema rules we added
+        // Cascade delete for channels and messages is defined in schema.prisma,
+        // so deleting the server will clean up everything.
         return prisma.server.delete({
             where: { id: serverId }
         });

@@ -21,15 +21,16 @@ const newChannelType = ref<'text' | 'voice'>('text')
 const editingChannelId = ref<string | null>(null)
 const editingChannelName = ref('')
 
+const showTransferModal = ref(false)
+const selectedMemberForTransfer = ref<any>(null)
+const transferConfirmName = ref('')
+
 const currentServer = computed(() => serverStore.currentServer)
 const channels = computed(() => serverStore.channels)
 const inviteLink = computed(() => currentServer.value?.inviteCode ? `https://vertex.sergidalmau.dev/invite/${currentServer.value.inviteCode}` : '')
 
 async function handleDeleteServer() {
-  if (serverNameConfirm.value !== currentServer.value?.name) {
-    alert('Server name does not match')
-    return
-  }
+  if (serverNameConfirm.value !== currentServer.value?.name) return
   const ok = await serverStore.deleteServer(currentServer.value.id)
   if (ok) emit('close')
 }
@@ -63,6 +64,7 @@ async function handleRevokeInvite() {
 }
 
 function copyInvite() {
+  if (!inviteLink.value) return
   navigator.clipboard.writeText(inviteLink.value)
   alert('Link copied to clipboard!')
 }
@@ -70,14 +72,29 @@ function copyInvite() {
 async function handleKick(userId: string) {
   if (confirm('Are you sure you want to kick this member?')) {
     await serverStore.kickMember(currentServer.value.id, userId)
-    // Optionally refresh members list if we had one in state
+    await serverStore.fetchServers() // Refresh member list
+  }
+}
+
+function openTransferConfirm(member: any) {
+  selectedMemberForTransfer.value = member
+  showTransferModal.value = true
+  transferConfirmName.value = ''
+}
+
+async function handleTransferOwnership() {
+  if (transferConfirmName.value !== currentServer.value?.name) return
+  const ok = await serverStore.transferOwnership(currentServer.value.id, selectedMemberForTransfer.value.user.id)
+  if (ok) {
+    showTransferModal.value = false
+    emit('close') // Close settings since user is no longer owner
   }
 }
 </script>
 
 <template>
   <div v-if="show" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-    <div class="bg-[var(--v-bg-base)] border border-[var(--v-border)] w-full max-w-4xl h-[600px] rounded-3xl shadow-2xl flex overflow-hidden">
+    <div class="bg-[var(--v-bg-base)] border border-[var(--v-border)] w-full max-w-4xl h-[640px] rounded-3xl shadow-2xl flex overflow-hidden">
       <!-- Sidebar -->
       <aside class="w-64 bg-[var(--v-bg-sidebar)] border-r border-[var(--v-border)] p-6 flex flex-col">
         <h2 class="text-xs font-black uppercase tracking-[0.2em] text-[var(--v-text-secondary)] mb-6 opacity-50">Settings</h2>
@@ -106,16 +123,23 @@ async function handleKick(userId: string) {
             <p class="text-[var(--v-text-secondary)] text-sm font-medium">Manage the core identity of your communication node.</p>
           </div>
 
-          <div class="p-6 rounded-2xl bg-red-500/5 border border-red-500/20 space-y-4">
-             <h3 class="text-red-500 font-black text-xs uppercase tracking-widest">Danger Zone</h3>
-             <p class="text-xs text-[var(--v-text-secondary)]">Once you delete a server, there is no going back. Please be certain.</p>
-             <div class="space-y-2">
-               <label class="text-[10px] font-bold uppercase text-[var(--v-text-secondary)]">TYPE "{{ currentServer?.name }}" TO CONFIRM</label>
-               <input v-model="serverNameConfirm" type="text" class="w-full bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl px-4 py-2 text-sm outline-none focus:border-red-500 transition-all" />
-             </div>
-             <button @click="handleDeleteServer" class="w-full py-3 bg-red-500 text-white font-black text-xs uppercase rounded-xl hover:bg-red-600 transition-all shadow-lg shadow-red-500/20">
-               Permanently Delete Server
-             </button>
+          <!-- Danger Zones -->
+          <div class="space-y-6">
+            <div class="p-6 rounded-2xl bg-red-500/5 border border-red-500/20 space-y-4">
+              <h3 class="text-red-500 font-black text-xs uppercase tracking-widest">Delete Server</h3>
+              <p class="text-xs text-[var(--v-text-secondary)]">Once you delete a server, there is no going back. All messages, channels, and data will be lost forever.</p>
+              <div class="space-y-2">
+                <label class="text-[10px] font-bold uppercase text-[var(--v-text-secondary)]">TYPE "{{ currentServer?.name }}" TO CONFIRM</label>
+                <input v-model="serverNameConfirm" type="text" class="w-full bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl px-4 py-2 text-sm outline-none focus:border-red-500 transition-all" />
+              </div>
+              <button 
+                @click="handleDeleteServer" 
+                :disabled="serverNameConfirm !== currentServer?.name"
+                class="w-full py-3 bg-red-500 text-white font-black text-xs uppercase rounded-xl hover:bg-red-600 transition-all shadow-lg shadow-red-500/20 disabled:opacity-30"
+              >
+                Permanently Delete Server
+              </button>
+            </div>
           </div>
         </section>
 
@@ -154,7 +178,7 @@ async function handleKick(userId: string) {
         <section v-if="activeTab === 'members'" class="space-y-8 animate-in slide-in-from-right-4 duration-500">
            <h1 class="text-2xl font-black text-white uppercase italic tracking-tighter">Authorized Entities</h1>
            <div class="space-y-3">
-             <div v-for="member in currentServer?.members" :key="member.id" class="flex items-center justify-between p-4 bg-[var(--v-bg-surface)]/50 rounded-2xl border border-[var(--v-border)]">
+             <div v-for="member in currentServer?.members" :key="member.id" class="flex items-center justify-between p-4 bg-[var(--v-bg-surface)]/50 rounded-2xl border border-[var(--v-border)] group">
                <div class="flex items-center space-x-4">
                  <div class="w-10 h-10 rounded-xl bg-[var(--v-bg-surface)] border border-[var(--v-border)] flex items-center justify-center font-black">
                    {{ member.user.username.charAt(0).toUpperCase() }}
@@ -164,8 +188,10 @@ async function handleKick(userId: string) {
                    <span class="text-[8px] font-black uppercase text-[var(--v-accent)]">{{ member.role }}</span>
                  </div>
                </div>
-               <div v-if="member.user.id !== authStore.user?.id" class="flex space-x-2">
-                 <button @click="handleKick(member.user.id)" class="px-4 py-2 bg-red-500/10 text-red-500 text-[10px] font-black uppercase rounded-xl hover:bg-red-500 hover:text-white transition-all">Kick Entity</button>
+               
+               <div v-if="member.user.id !== authStore.user?.id" class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-all">
+                 <button @click="openTransferConfirm(member)" class="px-3 py-1.5 bg-yellow-500/10 text-yellow-500 text-[9px] font-black uppercase rounded-lg border border-yellow-500/20 hover:bg-yellow-500 hover:text-black transition-all">Transfer Ownership</button>
+                 <button @click="handleKick(member.user.id)" class="px-3 py-1.5 bg-red-500/10 text-red-500 text-[9px] font-black uppercase rounded-lg border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">Kick Entity</button>
                </div>
              </div>
            </div>
@@ -186,7 +212,11 @@ async function handleKick(userId: string) {
                  <span class="flex-1 px-4 text-sm font-mono text-[var(--v-accent)] truncate">{{ inviteLink }}</span>
                  <button @click="copyInvite" class="px-4 py-2 bg-[var(--v-accent)] text-[var(--v-bg-base)] font-black text-[10px] rounded-xl uppercase shadow-lg">Copy</button>
                </div>
-               <button @click="handleRevokeInvite" class="text-[10px] font-black uppercase text-red-500 hover:underline">Revoke and Terminate Link</button>
+               <div class="flex items-center justify-center space-x-4">
+                 <button @click="handleGenerateInvite" class="text-[10px] font-black uppercase text-[var(--v-accent)] hover:underline">Regenerate Link</button>
+                 <span class="text-[var(--v-border)]">|</span>
+                 <button @click="handleRevokeInvite" class="text-[10px] font-black uppercase text-red-500 hover:underline">Revoke and Terminate</button>
+               </div>
             </div>
 
             <div v-else class="space-y-4">
@@ -199,6 +229,30 @@ async function handleKick(userId: string) {
         </section>
       </main>
     </div>
+
+    <!-- Transfer Ownership Modal -->
+    <div v-if="showTransferModal" class="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+       <div class="bg-[var(--v-bg-surface)] border border-[var(--v-border)] p-8 rounded-3xl w-full max-w-md shadow-2xl space-y-6">
+          <div class="text-center">
+            <h2 class="text-xl font-black text-white uppercase italic tracking-tighter">Transfer Ownership</h2>
+            <p class="text-xs text-[var(--v-text-secondary)] mt-2 font-medium leading-relaxed">
+               You are about to transfer ownership of <span class="text-white font-bold">{{ currentServer?.name }}</span> to 
+               <span class="text-[var(--v-accent)] font-bold">{{ selectedMemberForTransfer?.user.username }}</span>.
+               This action is permanent. You will lose all administrative control.
+            </p>
+          </div>
+
+          <div class="space-y-3">
+             <label class="text-[10px] font-black uppercase text-[var(--v-text-secondary)] tracking-widest">Type "{{ currentServer?.name }}" to confirm transfer</label>
+             <input v-model="transferConfirmName" type="text" class="w-full bg-[var(--v-bg-base)] border border-[var(--v-border)] rounded-xl px-4 py-3 text-sm outline-none focus:border-yellow-500 transition-all font-bold" />
+          </div>
+
+          <div class="flex space-x-3">
+             <button @click="showTransferModal = false" class="flex-1 py-3 bg-white/5 text-[var(--v-text-secondary)] font-black text-xs uppercase rounded-xl hover:bg-white/10 transition-all">Abort</button>
+             <button @click="handleTransferOwnership" :disabled="transferConfirmName !== currentServer?.name" class="flex-2 py-3 bg-yellow-500 text-black font-black text-xs uppercase rounded-xl hover:bg-yellow-600 transition-all shadow-xl shadow-yellow-500/20 disabled:opacity-30 px-8">Confirm Transfer</button>
+          </div>
+       </div>
+    </div>
   </div>
 </template>
 
@@ -209,5 +263,9 @@ async function handleKick(userId: string) {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+.animate-in {
+  animation-duration: 0.3s;
+  animation-fill-mode: both;
 }
 </style>
