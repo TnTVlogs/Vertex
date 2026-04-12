@@ -2,25 +2,24 @@ import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "@prisma/client";
 import * as mariadb from "mariadb";
 
-// Carreguem dades del .env (que ja ha estat carregat a index.ts)
-const dbConfig = {
-    host: process.env.DB_HOST || '127.0.0.1',
-    port: Number(process.env.DB_PORT) || 3306,
-    user: process.env.DB_USER || 'vertex_user',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'vertex',
-    connectionLimit: 10
-};
+// Usem la cadena de connexió però ens assegurem que el protocol sigui mariadb://
+// ja que alguns parsers del driver de mariadb no agafen bé el protocol mysql://
+let url = process.env.DATABASE_URL || '';
+if (url.startsWith('mysql://')) {
+    url = url.replace('mysql://', 'mariadb://');
+}
 
 console.log("--- [DEBUG] Prisma Driver Adapter Connection ---");
 console.log("Timestamp:", new Date().toISOString());
 console.log("PID:", process.pid);
-console.log("User:", dbConfig.user);
-console.log("Database:", dbConfig.database);
-console.log("Password defined:", dbConfig.password ? "SÍ" : "NO");
+console.log("Protocol correcte:", url.startsWith('mariadb://') ? "SÍ" : "NO");
 console.log("------------------------------------------------");
 
-const pool = mariadb.createPool(dbConfig);
+if (!url) {
+    throw new Error("DATABASE_URL no definida");
+}
+
+const pool = mariadb.createPool(url);
 
 const adapter = new PrismaMariaDb(pool as any);
 
