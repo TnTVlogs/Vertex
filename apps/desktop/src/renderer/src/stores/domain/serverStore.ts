@@ -144,6 +144,28 @@ export const useServerStore = defineStore('server', {
                 this.servers = this.servers.filter(s => s.id !== serverId);
             }
             return res.ok;
+        },
+
+        async joinServer(inviteCode: string) {
+            const authStore = useAuthStore();
+            if (!authStore.user) return false;
+            
+            const res = await fetch(`${ENV.API_URL}/servers/join`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${authStore.token}`
+                },
+                body: JSON.stringify({ inviteCode, userId: authStore.user.id })
+            });
+
+            if (res.ok) {
+                await this.fetchServers();
+                return true;
+            } else {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to join server');
+            }
         }
     }
 });

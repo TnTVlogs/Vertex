@@ -10,6 +10,7 @@ const router = Router();
 router.post('/create', requireAuth, serverController.createServer);
 router.get('/user/:userId', requireAuth, serverController.getUserServers);
 router.get('/:serverId/channels', requireAuth, serverController.getServerChannels);
+router.post('/join', requireAuth, serverController.joinServer);
 
 // Management Routes (Owner only)
 router.post('/:id/channels', requireAuth, requireServerOwner, serverSettingsController.createChannel);

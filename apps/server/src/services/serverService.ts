@@ -66,5 +66,37 @@ export const serverService = {
         return prisma.channel.findMany({
             where: { serverId }
         });
+    },
+
+    async joinServerByCode(inviteCode: string, userId: string) {
+        const server = await prisma.server.findUnique({
+            where: { inviteCode }
+        });
+
+        if (!server) {
+            throw new Error('Invalid invite code');
+        }
+
+        // Check if already a member
+        const existingMember = await prisma.member.findUnique({
+            where: {
+                serverId_userId: {
+                    serverId: server.id,
+                    userId
+                }
+            }
+        });
+
+        if (existingMember) {
+            throw new Error('You are already a member of this server');
+        }
+
+        return prisma.member.create({
+            data: {
+                serverId: server.id,
+                userId,
+                role: 'member'
+            }
+        });
     }
 };

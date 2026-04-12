@@ -20,6 +20,7 @@ const i18n = useI18nStore()
 const friendsTab = ref<'online' | 'all' | 'pending'>('online')
 const showAddFriendModal = ref(false)
 const showCreateServerModal = ref(false)
+const serverActionTab = ref<'create' | 'join'>('create')
 const showServerSettingsModal = ref(false)
 
 const filteredFriends = computed(() => {
@@ -114,16 +115,31 @@ const onAddFriend = async (username: string) => {
   }
 }
 
-const onCreateServer = async (name: string) => {
-  if (!name) return
-  const res = await fetch(`${ENV.API_URL}/servers/create`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, ownerId: authStore.user?.id })
-  })
-  if (res.ok) {
-    await chatStore.fetchServers()
-    showCreateServerModal.value = false
+const onServerAction = async (value: string) => {
+  if (!value) return
+  
+  if (serverActionTab.value === 'create') {
+    const res = await fetch(`${ENV.API_URL}/servers/create`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authStore.token}`
+      },
+      body: JSON.stringify({ name: value, ownerId: authStore.user?.id })
+    })
+    if (res.ok) {
+      await chatStore.fetchServers()
+      showCreateServerModal.value = false
+    }
+  } else {
+    try {
+      const ok = await serverStore.joinServer(value)
+      if (ok) {
+        showCreateServerModal.value = false
+      }
+    } catch (e: any) {
+      alert(e.message)
+    }
   }
 }
 </script>
@@ -396,14 +412,32 @@ const onCreateServer = async (name: string) => {
 
     <!-- Modals -->
     <Modal 
-      title="INITIALIZE SERVER" 
-      label="Server Identifier" 
+      :title="serverActionTab === 'create' ? 'INITIALIZE SERVER' : 'JOIN SERVER'" 
+      :label="serverActionTab === 'create' ? 'Server Identifier' : 'Invitation Code'" 
       :show="showCreateServerModal" 
       @close="showCreateServerModal = false"
-      @confirm="onCreateServer"
+      @confirm="onServerAction"
     >
       <template #description>
-        <p class="text-[var(--v-text-secondary)] text-center text-xs mb-6 font-bold uppercase tracking-widest">Establish a new encrypted communication node.</p>
+        <div class="flex p-1 bg-black/20 rounded-xl mb-6">
+          <button 
+            @click="serverActionTab = 'create'"
+            class="flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all"
+            :class="serverActionTab === 'create' ? 'bg-[var(--v-accent)] text-[var(--v-bg-base)]' : 'text-[var(--v-text-secondary)] hover:text-white'"
+          >
+            Create
+          </button>
+          <button 
+            @click="serverActionTab = 'join'"
+            class="flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all"
+            :class="serverActionTab === 'join' ? 'bg-[var(--v-accent)] text-[var(--v-bg-base)]' : 'text-[var(--v-text-secondary)] hover:text-white'"
+          >
+            Join
+          </button>
+        </div>
+        <p class="text-[var(--v-text-secondary)] text-center text-xs mb-6 font-bold uppercase tracking-widest leading-relaxed">
+          {{ serverActionTab === 'create' ? 'Establish a new encrypted communication node.' : 'Enter an invitation code to link with an existing node.' }}
+        </p>
       </template>
     </Modal>
 

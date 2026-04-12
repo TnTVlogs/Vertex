@@ -33,5 +33,16 @@ export const serverController = {
             console.error('getServerChannels error:', error);
             res.status(500).json({ error: error.message });
         }
+    },
+
+    async joinServer(req: Request, res: Response) {
+        const { inviteCode, userId } = req.body;
+        try {
+            await serverService.joinServerByCode(inviteCode, userId);
+            res.json({ message: 'Successfully joined the server' });
+        } catch (error: any) {
+            console.error('joinServer error:', error);
+            res.status(400).json({ error: error.message });
+        }
     }
 };
