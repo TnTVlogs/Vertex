@@ -44,5 +44,16 @@ export const serverController = {
             console.error('joinServer error:', error);
             res.status(400).json({ error: error.message });
         }
+    },
+
+    async getInvitePreview(req: Request, res: Response) {
+        const { code } = req.params;
+        try {
+            const preview = await serverService.getPreviewByInviteCode(code);
+            res.json(preview);
+        } catch (error: any) {
+            console.error('getInvitePreview error:', error);
+            res.status(404).json({ error: error.message });
+        }
     }
 };

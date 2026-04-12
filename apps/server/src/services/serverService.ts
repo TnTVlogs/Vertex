@@ -98,5 +98,29 @@ export const serverService = {
                 role: 'member'
             }
         });
+    },
+
+    async getPreviewByInviteCode(inviteCode: string) {
+        const server = await prisma.server.findUnique({
+            where: { inviteCode },
+            include: {
+                _count: {
+                    select: { members: true }
+                },
+                owner: {
+                    select: { username: true }
+                }
+            }
+        });
+
+        if (!server) {
+            throw new Error('Invalid invite code');
+        }
+
+        return {
+            name: server.name,
+            ownerUsername: server.owner?.username,
+            memberCount: server._count.members
+        };
     }
 };

@@ -119,6 +119,15 @@ async function handleSubmit() {
         error.value = data.error || i18n.t('auth.error_failed')
       }
     }
+
+    // [MOD] Redirecció d'Invitacions Pendent
+    if (isLogin.value && !error.value) {
+      const pendingInvite = localStorage.getItem('vertex_pending_invite')
+      if (pendingInvite) {
+        localStorage.removeItem('vertex_pending_invite')
+        window.location.href = `/invite/${pendingInvite}`
+      }
+    }
   } catch (err: any) {
     error.value = err.message || i18n.t('auth.error_failed')
   }

@@ -10,6 +10,10 @@ const router = Router();
 router.post('/create', requireAuth, serverController.createServer);
 router.get('/user/:userId', requireAuth, serverController.getUserServers);
 router.get('/:serverId/channels', requireAuth, serverController.getServerChannels);
+
+// Public Preview Route
+router.get('/invite/:code', serverController.getInvitePreview);
+
 router.post('/join', requireAuth, serverController.joinServer);
 
 // Management Routes (Owner only)
