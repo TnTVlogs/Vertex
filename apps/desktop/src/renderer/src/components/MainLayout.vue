@@ -49,6 +49,9 @@ function getLastChannel(serverId: string): string | null {
 
 // Sync store on navigation
 function openDM(recipientId: string) {
+  // Evitar recarregar si ja estem a dins de la mateixa conversa (bug prevenció)
+  if (navStore.activeRecipientId === recipientId && navStore.activeView === 'home') return
+
   navStore.setDM(recipientId)
   chatStore.clearMessages()
 }
