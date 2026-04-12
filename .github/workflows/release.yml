@@ -58,16 +58,22 @@ jobs:
       - name: Build Windows Executable
         if: matrix.os == 'windows-latest'
         working-directory: ./apps/desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: npm run build:win
 
       - name: Build macOS DMG
         if: matrix.os == 'macos-latest'
         working-directory: ./apps/desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: npm run build:mac
 
       - name: Build Linux AppImage
         if: matrix.os == 'ubuntu-latest'
         working-directory: ./apps/desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: npm run build:linux
 
       - name: Upload to GitHub Release
