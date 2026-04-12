@@ -10,6 +10,7 @@ export default defineConfig({
         plugins: [externalizeDepsPlugin()]
     },
     renderer: {
+        base: process.env.WEB_BUILD === 'true' ? '/' : './',
         resolve: {
             alias: {
                 '@renderer': resolve('src/renderer/src'),
