@@ -15,7 +15,11 @@ console.log("CWD:", process.cwd());
 console.log("DATABASE_URL carregada:", process.env.DATABASE_URL ? "SÍ" : "NO");
 // Fem un cast a 'any' per evitar l'error de la propietat 'uri'
 const pool = mariadb.createPool({
-    uri: url,
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: Number(process.env.DB_PORT) || 3306,
+    user: process.env.DB_USER || 'vertex_user',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'vertex',
     connectionLimit: 10
 } as any);
 
