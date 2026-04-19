@@ -29,25 +29,15 @@
           <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
         </button>
         <input ref="fileInput" type="file" class="hidden" @change="handleFileChange" />
-        <div class="relative flex-1 min-h-[1.5em]">
-          <div
-            ref="overlayRef"
-            aria-hidden="true"
-            class="absolute inset-0 px-4 py-2 text-sm font-medium text-[var(--v-text-primary)] tracking-wide overflow-hidden pointer-events-none"
-            v-html="formattedOverlay"
-          ></div>
-          <textarea
-            ref="chatInput"
-            v-model="messageText"
-            @keydown.enter.exact.prevent="handleSend"
-            @input="autoResize(); handleTyping(); syncOverlayScroll()"
-            @scroll="syncOverlayScroll"
-            rows="1"
-            :placeholder="i18n.t('chat.placeholder')"
-            class="relative w-full bg-transparent border-none outline-none resize-none px-4 py-2 text-sm font-medium tracking-wide overflow-y-auto max-h-32 min-h-[1.5em] select-text placeholder:text-[var(--v-text-secondary)] placeholder:opacity-50"
-            style="color: transparent; caret-color: var(--v-text-primary);"
-          ></textarea>
-        </div>
+        <textarea
+          ref="chatInput"
+          v-model="messageText"
+          @keydown.enter.exact.prevent="handleSend"
+          @input="autoResize(); handleTyping(); expandShortcodes()"
+          rows="1"
+          :placeholder="i18n.t('chat.placeholder')"
+          class="flex-1 bg-transparent border-none outline-none resize-none px-4 py-2 text-sm font-medium text-[var(--v-text-primary)] tracking-wide overflow-y-auto max-h-32 min-h-[1.5em] select-text placeholder:text-[var(--v-text-secondary)] placeholder:opacity-50"
+        ></textarea>
         <div class="flex items-center pr-2 space-x-1">
           <span
             v-if="charCount > 0"
@@ -82,8 +72,7 @@ import { useMessageStore } from '../stores/domain/messageStore'
 import { useI18nStore } from '../stores/i18nStore'
 import { useSocketStore } from '../stores/domain/socketStore'
 import EmojiPicker from './EmojiPicker.vue'
-import { parseEmojis } from '../utils/emoji'
-import DOMPurify from 'dompurify'
+import { SHORTCODE_TO_UNICODE } from '../utils/shortcodes'
 import { v4 as uuidv4 } from 'uuid'
 
 const chatStore = useChatStore()
@@ -94,7 +83,6 @@ const socketStore = useSocketStore()
 
 const showEmojiPicker = ref(false)
 const chatInput = ref<HTMLTextAreaElement | null>(null)
-const overlayRef = ref<HTMLDivElement | null>(null)
 const inputContainer = ref<HTMLElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const messageText = ref('')
@@ -123,25 +111,23 @@ async function handleFileChange(e: Event) {
   }
 }
 
-const formattedOverlay = computed(() => {
-  if (!messageText.value) return ''
-  const escaped = messageText.value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-    .replace(/\n/g, '<br>')
-  return DOMPurify.sanitize(parseEmojis(escaped), {
-    ALLOWED_TAGS: ['img', 'br'],
-    ALLOWED_ATTR: ['src', 'alt', 'class', 'loading'],
+function expandShortcodes() {
+  const el = chatInput.value
+  if (!el) return
+  const cursor = el.selectionStart ?? 0
+  const text = messageText.value
+  const before = text.slice(0, cursor)
+  const match = before.match(/:([a-z0-9_]+):$/)
+  if (!match) return
+  const shortcode = match[0]
+  const unicode = SHORTCODE_TO_UNICODE[shortcode]
+  if (!unicode) return
+  const start = cursor - shortcode.length
+  messageText.value = text.slice(0, start) + unicode + text.slice(cursor)
+  nextTick(() => {
+    const newPos = start + unicode.length
+    el.setSelectionRange(newPos, newPos)
   })
-})
-
-function syncOverlayScroll() {
-  if (overlayRef.value && chatInput.value) {
-    overlayRef.value.scrollTop = chatInput.value.scrollTop
-  }
 }
 
 const TIER_LIMITS: Record<string, number> = { BASIC: 200, PRO: 400, VIP: 500 }
