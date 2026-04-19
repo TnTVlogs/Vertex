@@ -1,0 +1,77 @@
+{
+  "name": "vertex-desktop",
+  "version": "1.0.0",
+  "repository": "https://github.com/TnTVlogs/Vertex",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "build:web": "WEB_BUILD=true electron-vite build",
+    "preview": "electron-vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "postinstall": "electron-builder install-app-deps",
+    "build:win": "npm run build && electron-builder --win",
+    "build:linux": "npm run build && electron-builder --linux",
+    "build:mac": "npm run build && electron-builder --mac"
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "^3.0.2",
+    "@electron-toolkit/utils": "^4.0.0",
+    "@twemoji/api": "^17.0.2",
+    "dompurify": "^3.4.0",
+    "electron-updater": "^6.8.3",
+    "pinia": "^2.1.0",
+    "socket.io-client": "^4.7.0",
+    "uuid": "^13.0.0",
+    "virtua": "^0.49.1",
+    "vue": "^3.4.0",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@types/dompurify": "^3.0.5",
+    "@types/node": "^25.6.0",
+    "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/test-utils": "^2.4.6",
+    "autoprefixer": "^10.4.0",
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1",
+    "electron-vite": "^6.0.0-beta.1",
+    "jsdom": "^29.0.2",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.8.0",
+    "vite": "^8.0.1",
+    "vitest": "^4.1.4",
+    "vue-tsc": "^3.2.6"
+  },
+  "build": {
+    "appId": "com.vertex.app",
+    "productName": "Vertex",
+    "directories": {
+      "output": "dist"
+    },
+    "publish": {
+      "provider": "github"
+    },
+    "files": [
+      "out/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Chat"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "resources/icon.icns"
+    }
+  }
+}

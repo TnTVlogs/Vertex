@@ -1,0 +1,15 @@
+{
+  "name": "vertex",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test --prefix apps/server && npm test --prefix apps/desktop",
+    "test:server": "npm test --prefix apps/server",
+    "test:desktop": "npm test --prefix apps/desktop"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

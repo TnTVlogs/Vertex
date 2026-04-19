@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build Outputs
+dist/
+out/
+build/
+*.log
+*.tsbuildinfo
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Electron specific
+apps/desktop/dist/
+apps/desktop/out/
+apps/server/dist/
+
+# Prisma
+apps/server/prisma/dev.db
+apps/server/prisma/migrations/

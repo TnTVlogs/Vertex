@@ -1,0 +1,208 @@
+<template>
+  <div class="flex-1 overflow-hidden flex flex-col">
+    <!-- Load older messages -->
+    <div class="flex justify-center py-2 shrink-0">
+      <button
+        v-if="messageStore.hasMore && !messageStore.isLoading"
+        @click="handleLoadOlder"
+        :disabled="messageStore.isLoadingOlder"
+        class="text-[10px] font-black uppercase tracking-widest text-[var(--v-text-secondary)] hover:text-[var(--v-accent)] transition-colors disabled:opacity-40"
+      >
+        {{ messageStore.isLoadingOlder ? '...' : '↑ Load older messages' }}
+      </button>
+    </div>
+
+    <!-- Skeletons while loading -->
+    <div v-if="messageStore.isLoading" class="flex-1 overflow-y-auto px-8 py-6 space-y-6 no-scrollbar">
+      <div v-for="i in 6" :key="i"
+           class="flex items-end space-x-3 opacity-20 animate-pulse"
+           :class="i % 3 === 0 ? 'flex-row-reverse space-x-reverse' : 'flex-row'"
+      >
+        <div class="w-9 h-9 rounded-xl bg-white/20 shrink-0"></div>
+        <div class="flex flex-col space-y-2 w-1/2" :class="i % 3 === 0 ? 'items-end' : 'items-start'">
+          <div class="h-2 w-20 bg-white/20 rounded"></div>
+          <div class="h-10 w-full bg-white/20 rounded-2xl" :class="i % 3 === 0 ? 'rounded-br-sm' : 'rounded-bl-sm'"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div v-else-if="sortedMessages.length === 0" class="flex-1 flex flex-col items-center justify-center opacity-20">
+      <p class="text-xs font-black tracking-[0.3em] italic uppercase">{{ i18n.t('chat.no_logs') }}</p>
+    </div>
+
+    <!-- Virtual message list -->
+    <VList
+      v-else
+      ref="vListRef"
+      class="flex-1 px-8 py-6 no-scrollbar"
+      :data="sortedMessages"
+      :bufferSize="4"
+    >
+      <template #default="{ item: msg, index }">
+        <div
+          class="flex group animate-in fade-in slide-in-from-bottom-2 duration-500"
+          :class="[
+            msg.authorId === authStore.user?.id ? 'flex-row-reverse space-x-reverse' : 'flex-row',
+            'items-end space-x-3',
+            shouldShowAuthor(msg, index) ? 'mt-6' : 'mt-1'
+          ]"
+        >
+          <!-- Avatar Area (only shown if new group) -->
+          <div class="w-9 h-9 shrink-0">
+            <UserAvatar
+              v-if="shouldShowAuthor(msg, index)"
+              :username="msg.author?.username"
+              size="sm"
+              variant="surface"
+              :online="msg.authorId !== authStore.user?.id ? true : undefined"
+            />
+          </div>
+
+          <!-- Content -->
+          <div class="flex flex-col max-w-[70%]" :class="msg.authorId === authStore.user?.id ? 'items-end' : 'items-start'">
+            <div v-if="shouldShowAuthor(msg, index)" class="flex items-center mb-1 space-x-2 px-1">
+              <span class="text-[9px] font-black uppercase tracking-widest text-[var(--v-text-secondary)]">
+                {{ msg.author?.username || 'ANONYMOUS' }}
+              </span>
+              <span class="text-[8px] font-mono text-[var(--v-text-secondary)] opacity-40">
+                {{ formatTime(msg.createdAt) }}
+              </span>
+            </div>
+            <div
+              class="px-3 py-1.5 rounded-2xl leading-relaxed shadow-sm border transition-all select-text relative group/msg"
+              :style="{ fontSize: `${settingsStore.chatFontSize}px` }"
+              :class="[
+                msg.authorId === authStore.user?.id
+                  ? (msg.status === 'error' ? 'bg-red-900/50 border-red-500 text-red-100' : 'bg-[var(--v-accent)] text-white border-transparent shadow-[0_4px_15px_var(--v-accent-glow)]')
+                  : 'bg-[var(--v-bg-surface)] border-[var(--v-border)] text-[var(--v-text-primary)] hover:border-[var(--v-accent)]',
+                shouldShowAuthor(msg, index)
+                  ? (msg.authorId === authStore.user?.id ? 'rounded-br-sm' : 'rounded-bl-sm')
+                  : 'rounded-xl',
+                msg.status === 'sending' ? 'opacity-50 cursor-wait' : ''
+              ]"
+            >
+              <div v-html="formatMessage(msg.content)"></div>
+
+              <!-- Status Indicators -->
+              <div v-if="msg.authorId === authStore.user?.id" class="absolute -left-6 bottom-1 flex items-center space-x-1 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                <span v-if="msg.status === 'error'" @click="handleRetry(msg)" class="text-red-500 cursor-pointer hover:scale-110 transition-transform" title="Retry transmission">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-5.5-2.69-5.5-5.5s2.19-5.5 5.5-5.5c1.66 0 3.14.69 4.22 1.78L13 11h7V5l-2.35 1.35z"/></svg>
+                </span>
+                <span v-if="msg.status === 'sending'" class="text-[var(--v-accent)] animate-spin">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 4V2C6.48 2 2 6.48 2 12h2c0-4.41 3.59-8 8-8zm5.75 3.25l1.45-1.45C17.72 4.32 15.01 3 12 3v2c2.25 0 4.31.91 5.75 2.25z"/></svg>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </VList>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, nextTick, computed } from 'vue'
+import { VList } from 'virtua/vue'
+import UserAvatar from './UserAvatar.vue'
+import { useChatStore } from '../stores/chatStore'
+import { useAuthStore } from '../stores/authStore'
+import { useSettingsStore } from '../stores/settingsStore'
+import { useI18nStore } from '../stores/i18nStore'
+import { useMessageStore } from '../stores/domain/messageStore'
+import { parseEmojis } from '../utils/emoji'
+import DOMPurify from 'dompurify'
+import type { Message } from '@shared/models'
+
+const chatStore = useChatStore()
+const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
+const i18n = useI18nStore()
+const messageStore = useMessageStore()
+
+const vListRef = ref<InstanceType<typeof VList> | null>(null)
+const sortedMessages = computed((): Message[] => chatStore.sortedMessages)
+
+function formatMessage(text: string) {
+  if (!text) return ''
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+  const withEmojis = parseEmojis(escaped)
+  return DOMPurify.sanitize(withEmojis, {
+    ALLOWED_TAGS: ['img', 'br'],
+    ALLOWED_ATTR: ['src', 'alt', 'class', 'loading'],
+  })
+}
+
+function scrollToBottom() {
+  nextTick(() => {
+    const msgs = sortedMessages.value
+    if (vListRef.value && msgs.length > 0) {
+      vListRef.value.scrollToIndex(msgs.length - 1, { align: 'end' })
+    }
+  })
+}
+
+async function handleLoadOlder() {
+  const prevCount = sortedMessages.value.length
+  await messageStore.loadOlderMessages()
+  nextTick(() => {
+    const newCount = sortedMessages.value.length
+    const addedCount = newCount - prevCount
+    if (vListRef.value && addedCount > 0) {
+      vListRef.value.scrollToIndex(addedCount, { align: 'start' })
+    }
+  })
+}
+
+async function handleRetry(msg: Message) {
+  const tempId = msg.id
+  messageStore.updateMessageStatus(tempId, 'sending')
+  try {
+    const response = await chatStore.sendMessage(msg.content)
+    if (response && response.status === 'ok') {
+      messageStore.updateMessageStatus(tempId, 'sent', response.messageId)
+    } else {
+      messageStore.updateMessageStatus(tempId, 'error')
+    }
+  } catch (e) {
+    messageStore.updateMessageStatus(tempId, 'error')
+  }
+}
+
+function shouldShowAuthor(msg: Message, index: number) {
+  if (index === 0) return true
+  const prevMsg = sortedMessages.value[index - 1]
+  const isSameAuthor = prevMsg.authorId === msg.authorId
+  const diffMinutes = (new Date(msg.createdAt).getTime() - new Date(prevMsg.createdAt).getTime()) / 60000
+  return !isSameAuthor || diffMinutes > 1
+}
+
+function formatTime(date: string | Date) {
+  return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+defineExpose({ scrollToBottom })
+</script>
+
+<style scoped>
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.1; }
+}
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+</style>

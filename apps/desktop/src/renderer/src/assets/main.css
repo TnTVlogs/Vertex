@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --v-bg-base: #0a0a0a;
+  --v-bg-surface: #141414;
+  --v-bg-sidebar: #0f0f0f;
+  --v-accent: #10B981;
+  --v-accent-glow: rgba(16, 185, 129, 0.15);
+  --v-text-primary: #EEEEEE;
+  --v-text-secondary: #888888;
+  --v-border: rgba(255, 255, 255, 0.08);
+  --v-glass: #141414;
+  --v-text-inverse: #0a0a0a;
+}
+
+:root[data-theme="light"] {
+  --v-bg-base: #f7f7f8;
+  --v-bg-surface: #ffffff;
+  --v-bg-sidebar: #ebecf0;
+  --v-accent: #10B981;
+  --v-accent-glow: rgba(16, 185, 129, 0.15);
+  --v-text-primary: #121212;
+  --v-text-secondary: #6e6e73;
+  --v-border: rgba(0, 0, 0, 0.08);
+  --v-glass: #ffffff;
+  --v-text-inverse: #ffffff;
+}
+
+html, body {
+  @apply bg-[var(--v-bg-base)] text-[var(--v-text-primary)] overflow-hidden h-full;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  user-select: none;
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-[var(--v-glass)] border border-[var(--v-border)];
+  }
+  
+  .vertex-gradient {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .twemoji {
+    height: 1.25em;
+    width: 1.25em;
+    vertical-align: middle;
+    display: inline-block;
+    margin: 0 0.05em;
+  }
+}
+
+/* Custom scrollbar for some areas */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}

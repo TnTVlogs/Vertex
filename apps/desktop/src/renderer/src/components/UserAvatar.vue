@@ -1,0 +1,64 @@
+<template>
+  <div class="relative shrink-0" :style="{ width: sizePx, height: sizePx }">
+    <div
+      class="w-full h-full flex items-center justify-center font-black overflow-hidden transition-all border"
+      :class="[roundedClass, bgClass, textClass, borderClass]"
+    >
+      {{ initial }}
+    </div>
+    <div
+      v-if="online !== undefined"
+      class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--v-bg-surface)]"
+      :class="online ? 'bg-[#10B981]' : 'bg-[var(--v-text-secondary)] opacity-40'"
+    ></div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+
+const props = withDefaults(defineProps<{
+  username?: string
+  size?: 'xs' | 'sm' | 'md' | 'lg'
+  variant?: 'accent' | 'surface' | 'base'
+  online?: boolean
+}>(), {
+  size: 'sm',
+  variant: 'surface',
+})
+
+const initial = computed(() => props.username?.charAt(0).toUpperCase() || '?')
+
+const sizePx = computed(() => ({
+  xs: '2rem',    // 32px / w-8
+  sm: '2.25rem', // 36px / w-9
+  md: '3rem',    // 48px / w-12
+  lg: '5rem',    // 80px / w-20
+}[props.size]))
+
+const roundedClass = computed(() => ({
+  xs: 'rounded-lg',
+  sm: 'rounded-xl',
+  md: 'rounded-xl',
+  lg: 'rounded-2xl',
+}[props.size]))
+
+const textClass = computed(() => ({
+  xs: 'text-sm',
+  sm: 'text-xs',
+  md: 'text-base',
+  lg: 'text-3xl',
+}[props.size]))
+
+const bgClass = computed(() => ({
+  accent:  'bg-[var(--v-accent)] text-[var(--v-bg-base)]',
+  surface: 'bg-[var(--v-bg-surface)] text-[var(--v-text-primary)]',
+  base:    'bg-[var(--v-bg-base)] text-[var(--v-text-primary)]',
+}[props.variant]))
+
+const borderClass = computed(() => ({
+  accent:  'border-transparent',
+  surface: 'border-[var(--v-border)] shadow-lg group-hover:border-[var(--v-accent)]',
+  base:    'border-[var(--v-border)] shadow-inner group-hover:border-[var(--v-accent)]',
+}[props.variant]))
+</script>

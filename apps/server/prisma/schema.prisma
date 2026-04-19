@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BANNED
+}
+
+enum UserTier {
+  BASIC
+  PRO
+  VIP
+}
+
+enum ChannelType {
+  text
+  voice
+}
+
+enum MemberRole {
+  member
+  owner
+}
+
+enum FriendRequestStatus {
+  pending
+  accepted
+  rejected
+}
+
+model User {
+  id              String     @id @default(uuid())
+  username        String     @unique
+  email           String     @unique
+  passwordHash    String     @map("password_hash")
+  avatarUrl       String?    @map("avatar_url")
+  status          UserStatus @default(PENDING)
+  tier            UserTier   @default(BASIC)
+  isAdmin         Boolean    @default(false) @map("is_admin")
+  registrationIp  String?    @map("registration_ip")
+
+  ownedServers  Server[]  @relation("ServerOwner")
+  memberships   Member[]
+  sentMessages  Message[] @relation("MessageAuthor")
+  receivedDMs   Message[] @relation("MessageRecipient")
+
+  // Relationships for friends
+  sentRequests     FriendRequest[] @relation("RequestSender")
+  receivedRequests FriendRequest[] @relation("RequestReceiver")
+  friends1         Friendship[]    @relation("Friend1")
+  friends2         Friendship[]    @relation("Friend2")
+
+  @@index([registrationIp])
+  @@map("users")
+}
+
+model FriendRequest {
+  id        String              @id @default(uuid())
+  fromId    String              @map("from_id")
+  toId      String              @map("to_id")
+  status    FriendRequestStatus @default(pending)
+
+  from User @relation("RequestSender", fields: [fromId], references: [id], onDelete: Cascade)
+  to   User @relation("RequestReceiver", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@map("friend_requests")
+}
+
+model Friendship {
+  id      String @id @default(uuid())
+  user1Id String @map("user1_id")
+  user2Id String @map("user2_id")
+
+  user1 User @relation("Friend1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2 User @relation("Friend2", fields: [user2Id], references: [id], onDelete: Cascade)
+
+  @@unique([user1Id, user2Id])
+  @@map("friendships")
+}
+
+model Server {
+  id               String    @id @default(uuid())
+  name             String
+  iconUrl          String?   @map("icon_url")
+  ownerId          String    @map("owner_id")
+  inviteCode       String?   @unique @map("invite_code")
+  inviteExpiresAt  DateTime? @map("invite_expires_at")
+
+  owner     User      @relation("ServerOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  channels  Channel[]
+  members   Member[]
+
+  @@map("servers")
+}
+
+model Channel {
+  id        String      @id @default(uuid())
+  serverId  String      @map("server_id")
+  name      String
+  type      ChannelType @default(text)
+
+  server    Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@map("channels")
+}
+
+model Member {
+  id        String     @id @default(uuid())
+  serverId  String     @map("server_id")
+  userId    String     @map("user_id")
+  role      MemberRole @default(member)
+  
+  server    Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([serverId, userId])
+  @@map("members")
+}
+
+model Message {
+  id            String    @id @default(uuid())
+  content       String    @db.Text
+  attachmentUrl String?   @map("attachment_url")
+  authorId      String    @map("author_id")
+  channelId     String?   @map("channel_id")
+  recipientId   String?   @map("recipient_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  author      User      @relation("MessageAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  channel     Channel?  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  recipient   User?     @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  // Composite indexes for the two main query patterns:
+  // 1. Channel history: WHERE channel_id = ? ORDER BY created_at DESC LIMIT ?
+  // 2. Daily count: WHERE author_id = ? AND created_at >= CURDATE()
+  @@index([channelId, createdAt])
+  @@index([authorId, createdAt])
+  @@map("messages")
+}
