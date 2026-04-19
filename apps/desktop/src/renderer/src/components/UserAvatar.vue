@@ -2,9 +2,16 @@
   <div class="relative shrink-0" :style="{ width: sizePx, height: sizePx }">
     <div
       class="w-full h-full flex items-center justify-center font-black overflow-hidden transition-all border"
-      :class="[roundedClass, bgClass, textClass, borderClass]"
+      :class="[roundedClass, !showImg ? bgClass : '', borderClass]"
     >
-      {{ initial }}
+      <img
+        v-if="avatarUrl && showImg"
+        :src="avatarUrl"
+        :alt="username"
+        class="w-full h-full object-cover"
+        @error="showImg = false"
+      />
+      <span v-else :class="textClass">{{ initial }}</span>
     </div>
     <div
       v-if="online !== undefined"
@@ -15,10 +22,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = withDefaults(defineProps<{
   username?: string
+  avatarUrl?: string | null
   size?: 'xs' | 'sm' | 'md' | 'lg'
   variant?: 'accent' | 'surface' | 'base'
   online?: boolean
@@ -27,13 +35,16 @@ const props = withDefaults(defineProps<{
   variant: 'surface',
 })
 
+const showImg = ref(!!props.avatarUrl)
+watch(() => props.avatarUrl, (v) => { showImg.value = !!v })
+
 const initial = computed(() => props.username?.charAt(0).toUpperCase() || '?')
 
 const sizePx = computed(() => ({
-  xs: '2rem',    // 32px / w-8
-  sm: '2.25rem', // 36px / w-9
-  md: '3rem',    // 48px / w-12
-  lg: '5rem',    // 80px / w-20
+  xs: '2rem',
+  sm: '2.25rem',
+  md: '3rem',
+  lg: '5rem',
 }[props.size]))
 
 const roundedClass = computed(() => ({

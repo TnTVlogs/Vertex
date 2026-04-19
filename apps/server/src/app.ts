@@ -5,6 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
 import swaggerUi from 'swagger-ui-express';
 import { openApiSpec } from './swagger';
 import authRoutes from './routes/auth';
@@ -12,6 +13,7 @@ import socialRoutes from './routes/social';
 import serverRoutes from './routes/servers';
 import messagesRoutes from './routes/messages';
 import adminRoutes from './routes/admin';
+import userRoutes from './routes/users';
 import { handleSocketConnections } from './socket/socketHandler';
 import { serverService } from './services/serverService';
 import { errorHandler } from './middleware/errorHandler';
@@ -83,6 +85,8 @@ const globalRateLimit = rateLimit({
     skip: (req) => req.path === '/api/v1/health',
 });
 
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
 app.use('/api/v1', globalRateLimit);
 
 app.use('/api/v1/auth', authRoutes);
@@ -90,6 +94,7 @@ app.use('/api/v1/social', socialRoutes);
 app.use('/api/v1/servers', serverRoutes);
 app.use('/api/v1/messages', messagesRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/users', userRoutes);
 
 app.get('/api/v1/health', (_req, res) => {
     res.json({ status: 'ok' });

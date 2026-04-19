@@ -7,10 +7,28 @@
         @select="addEmoji"
       />
 
-      <div class="glass rounded-2xl p-2 shadow-2xl flex items-center">
-        <button class="w-10 h-10 flex items-center justify-center text-[var(--v-text-secondary)] hover:text-[var(--v-text-primary)] transition-colors">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      <!-- Attachment badge -->
+      <div v-if="pendingAttachment" class="mb-2 flex items-center space-x-2 px-3 py-2 bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl text-xs font-bold text-[var(--v-text-secondary)]">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" class="text-[var(--v-accent)]"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+        <span class="flex-1 truncate max-w-xs">{{ pendingAttachment.filename }}</span>
+        <button @click="pendingAttachment = null" class="hover:text-red-500 transition-colors">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
+      </div>
+
+      <div class="glass rounded-2xl p-2 shadow-2xl flex items-center">
+        <!-- Attachment button -->
+        <button
+          @click="triggerFileUpload"
+          :disabled="isUploading"
+          class="w-10 h-10 flex items-center justify-center transition-colors"
+          :class="isUploading ? 'text-[var(--v-accent)]' : 'text-[var(--v-text-secondary)] hover:text-[var(--v-text-primary)]'"
+          title="Attach file"
+        >
+          <div v-if="isUploading" class="w-4 h-4 border-2 border-[var(--v-accent)] border-t-transparent rounded-full animate-spin"></div>
+          <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+        </button>
+        <input ref="fileInput" type="file" class="hidden" @change="handleFileChange" />
         <textarea
           ref="chatInput"
           v-model="messageText"
@@ -35,7 +53,7 @@
           </button>
           <button
             @click="handleSend"
-            :disabled="isOverLimit || charCount === 0 || isSending"
+            :disabled="isOverLimit || (charCount === 0 && !pendingAttachment) || isSending"
             class="px-4 py-2 rounded-xl vertex-gradient text-[var(--v-bg-base)] text-[10px] font-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed"
           >
             {{ i18n.t('chat.send') }}
@@ -65,10 +83,32 @@ const socketStore = useSocketStore()
 const showEmojiPicker = ref(false)
 const chatInput = ref<HTMLTextAreaElement | null>(null)
 const inputContainer = ref<HTMLElement | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
 const messageText = ref('')
 const isSending = ref(false)
+const isUploading = ref(false)
+const pendingAttachment = ref<{ url: string; filename: string; mimetype: string } | null>(null)
 let typingTimeout: ReturnType<typeof setTimeout> | null = null
 let isTyping = false
+
+function triggerFileUpload() {
+  fileInput.value?.click()
+}
+
+async function handleFileChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  isUploading.value = true
+  try {
+    const result = await authStore.uploadAttachment(file)
+    pendingAttachment.value = result
+  } catch (err: any) {
+    console.error('Attachment upload failed:', err.message)
+  } finally {
+    isUploading.value = false
+    if (fileInput.value) fileInput.value.value = ''
+  }
+}
 
 const TIER_LIMITS: Record<string, number> = { BASIC: 200, PRO: 400, VIP: 500 }
 const tierLimit = computed(() => {
@@ -100,46 +140,48 @@ function handleTyping() {
 async function handleSend() {
   if (isOverLimit.value || isSending.value) return
   const text = messageText.value.trim()
-  if (text && authStore.user) {
-    isSending.value = true
-    if (typingTimeout) clearTimeout(typingTimeout)
-    if (isTyping) {
-      isTyping = false
-      socketStore.emitStopTyping(chatStore.activeChannelId, chatStore.activeRecipientId)
-    }
-    const tempId = uuidv4()
+  const attachment = pendingAttachment.value
+  if ((!text && !attachment) || !authStore.user) return
 
-    // Add optimistically to UI
-    messageStore.addOptimisticMessage({
-      id: tempId,
-      content: text,
-      authorId: authStore.user.id,
-      channelId: chatStore.activeChannelId ?? undefined,
-      recipientId: chatStore.activeRecipientId ?? undefined,
-      createdAt: new Date(),
-      author: {
-        id: authStore.user.id,
-        username: authStore.user.username,
-        avatarUrl: authStore.user.avatarUrl
-      }
-    })
+  isSending.value = true
+  if (typingTimeout) clearTimeout(typingTimeout)
+  if (isTyping) {
+    isTyping = false
+    socketStore.emitStopTyping(chatStore.activeChannelId, chatStore.activeRecipientId)
+  }
+  const tempId = uuidv4()
 
-    messageText.value = ''
-    showEmojiPicker.value = false
-    nextTick(autoResize)
+  messageStore.addOptimisticMessage({
+    id: tempId,
+    content: text,
+    authorId: authStore.user.id,
+    channelId: chatStore.activeChannelId ?? undefined,
+    recipientId: chatStore.activeRecipientId ?? undefined,
+    createdAt: new Date(),
+    author: {
+      id: authStore.user.id,
+      username: authStore.user.username,
+      avatarUrl: authStore.user.avatarUrl
+    },
+    attachmentUrl: attachment?.url,
+  })
 
-    try {
-      const response = await chatStore.sendMessage(text)
-      if (response && response.status === 'ok') {
-        messageStore.updateMessageStatus(tempId, 'sent', response.messageId)
-      } else {
-        messageStore.updateMessageStatus(tempId, 'error')
-      }
-    } catch (e) {
+  messageText.value = ''
+  pendingAttachment.value = null
+  showEmojiPicker.value = false
+  nextTick(autoResize)
+
+  try {
+    const response = await chatStore.sendMessage(text, attachment?.url)
+    if (response && response.status === 'ok') {
+      messageStore.updateMessageStatus(tempId, 'sent', response.messageId)
+    } else {
       messageStore.updateMessageStatus(tempId, 'error')
-    } finally {
-      isSending.value = false
     }
+  } catch (e) {
+    messageStore.updateMessageStatus(tempId, 'error')
+  } finally {
+    isSending.value = false
   }
 }
 function addEmoji(shortcode: string) {

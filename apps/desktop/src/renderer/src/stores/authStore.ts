@@ -175,5 +175,53 @@ export const useAuthStore = defineStore('auth', () => {
         await SecureStorage.clearRefreshToken()
     }
 
-    return { user, token, login, logout, init, refreshAccessToken }
+    // ── UPDATE PROFILE ────────────────────────────────────────────────────────
+    async function updateProfile(username: string): Promise<void> {
+        const res = await fetch(`${ENV.API_URL}/users/profile`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.value}` },
+            body: JSON.stringify({ username }),
+        })
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.error ?? 'Failed to update profile')
+        }
+        const data = await res.json()
+        if (user.value) user.value = { ...user.value, ...data.user }
+    }
+
+    // ── UPLOAD AVATAR ─────────────────────────────────────────────────────────
+    async function uploadAvatar(file: File): Promise<void> {
+        const form = new FormData()
+        form.append('avatar', file)
+        const res = await fetch(`${ENV.API_URL}/users/avatar`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token.value}` },
+            body: form,
+        })
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.error ?? 'Failed to upload avatar')
+        }
+        const data = await res.json()
+        if (user.value) user.value = { ...user.value, ...data.user }
+    }
+
+    // ── UPLOAD ATTACHMENT ─────────────────────────────────────────────────────
+    async function uploadAttachment(file: File): Promise<{ url: string; filename: string; mimetype: string }> {
+        const form = new FormData()
+        form.append('file', file)
+        const res = await fetch(`${ENV.API_URL}/users/attachment`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token.value}` },
+            body: form,
+        })
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.error ?? 'Failed to upload file')
+        }
+        return res.json()
+    }
+
+    return { user, token, login, logout, init, refreshAccessToken, updateProfile, uploadAvatar, uploadAttachment }
 })

@@ -54,20 +54,27 @@ async function checkSocketRateLimit(socketId: string): Promise<boolean> {
 const ALLOWED_ATTACHMENT_HOSTS = (process.env.ALLOWED_ATTACHMENT_HOSTS ?? '')
     .split(',').map(h => h.trim()).filter(Boolean);
 
+const SELF_HOSTS = [
+    ...(process.env.SERVER_BASE_URL ? [new URL(process.env.SERVER_BASE_URL).hostname] : []),
+    ...(process.env.ALLOWED_ORIGINS ?? '').split(',').map(o => {
+        try { return new URL(o.trim()).hostname; } catch { return ''; }
+    }).filter(Boolean),
+];
+
 function isValidAttachmentUrl(url: string): boolean {
-    if (ALLOWED_ATTACHMENT_HOSTS.length === 0) return false;
     try {
         const { hostname } = new URL(url);
-        return ALLOWED_ATTACHMENT_HOSTS.includes(hostname);
+        return ALLOWED_ATTACHMENT_HOSTS.includes(hostname) || SELF_HOSTS.includes(hostname);
     } catch { return false; }
 }
 
 const sendMessageSchema = z.object({
-    content: z.string().min(1).max(2000),
+    content: z.string().max(2000).default(''),
     channelId: z.string().uuid().optional().nullable(),
     recipientId: z.string().uuid().optional().nullable(),
     attachmentUrl: z.string().url().optional().nullable(),
-}).refine(d => d.channelId || d.recipientId, 'Channel or recipient required');
+}).refine(d => d.channelId || d.recipientId, 'Channel or recipient required')
+  .refine(d => d.content.trim().length > 0 || d.attachmentUrl, 'Message must have content or attachment');
 
 export const handleSocketConnections = (io: Server) => {
     // Item 1: JWT auth middleware — all connections must provide valid token

@@ -66,7 +66,7 @@ const selectedExpiry = ref<number | null>(7) // days; null = never
 
 async function handleDeleteServer() {
   if (serverNameConfirm.value.toLowerCase() !== currentServer.value?.name.toLowerCase()) return
-  const ok = await serverStore.deleteServer(currentServer.value.id)
+  const ok = await serverStore.deleteServer(currentServer.value!.id)
   if (ok) {
     emit('close')
     navStore.setActiveView('home')
@@ -75,7 +75,7 @@ async function handleDeleteServer() {
 
 async function handleCreateChannel() {
   if (!newChannelName.value) return
-  const ok = await serverStore.createChannel(currentServer.value.id, newChannelName.value, newChannelType.value)
+  const ok = await serverStore.createChannel(currentServer.value!.id, newChannelName.value, newChannelType.value)
   if (ok) {
     newChannelName.value = ''
     newChannelType.value = 'text'
@@ -84,23 +84,23 @@ async function handleCreateChannel() {
 }
 
 async function handleUpdateChannel(channelId: string) {
-  const ok = await serverStore.updateChannel(currentServer.value.id, channelId, editingChannelName.value)
+  const ok = await serverStore.updateChannel(currentServer.value!.id, channelId, editingChannelName.value)
   if (ok) editingChannelId.value = null
 }
 
 async function handleDeleteChannel(channelId: string) {
   if (confirm('Are you sure you want to delete this channel?')) {
-    await serverStore.deleteChannel(currentServer.value.id, channelId)
+    await serverStore.deleteChannel(currentServer.value!.id, channelId)
   }
 }
 
 async function handleGenerateInvite() {
-  await serverStore.generateInvite(currentServer.value.id, selectedExpiry.value)
+  await serverStore.generateInvite(currentServer.value!.id, selectedExpiry.value)
   toastStore.addToast('New uplink matrix generated', 'success')
 }
 
 async function handleRevokeInvite() {
-  await serverStore.revokeInvite(currentServer.value.id)
+  await serverStore.revokeInvite(currentServer.value!.id)
   toastStore.addToast('Uplink matrix revoked securely', 'info')
 }
 
@@ -112,7 +112,7 @@ function copyInvite() {
 
 async function handleKick(userId: string) {
   if (confirm('Are you sure you want to kick this member?')) {
-    await serverStore.kickMember(currentServer.value.id, userId)
+    await serverStore.kickMember(currentServer.value!.id, userId)
     await serverStore.fetchServers() // Refresh member list
   }
 }
@@ -125,7 +125,7 @@ function openTransferConfirm(member: any) {
 
 async function handleTransferOwnership() {
   if (transferConfirmName.value !== currentServer.value?.name) return
-  const ok = await serverStore.transferOwnership(currentServer.value.id, selectedMemberForTransfer.value.user.id)
+  const ok = await serverStore.transferOwnership(currentServer.value!.id, selectedMemberForTransfer.value.userId)
   if (ok) {
     showTransferModal.value = false
     emit('close') // Close settings since user is no longer owner
@@ -222,17 +222,17 @@ async function handleTransferOwnership() {
              <div v-for="member in serverStore.members" :key="member.id" class="flex items-center justify-between p-4 bg-[var(--v-bg-surface)]/50 rounded-2xl border border-[var(--v-border)] group">
                <div class="flex items-center space-x-4">
                  <div class="w-10 h-10 rounded-xl bg-[var(--v-bg-surface)] border border-[var(--v-border)] flex items-center justify-center font-black">
-                   {{ member.user.username.charAt(0).toUpperCase() }}
+                   {{ member.username.charAt(0).toUpperCase() }}
                  </div>
                  <div class="flex flex-col">
-                   <span class="text-sm font-black text-white">{{ member.user.username }}</span>
+                   <span class="text-sm font-black text-white">{{ member.username }}</span>
                    <span class="text-[8px] font-black uppercase text-[var(--v-accent)]">{{ member.role }}</span>
                  </div>
                </div>
-               
-               <div v-if="member.user.id !== authStore.user?.id" class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-all">
+
+               <div v-if="member.userId !== authStore.user?.id" class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-all">
                  <button @click="openTransferConfirm(member)" class="px-3 py-1.5 bg-yellow-500/10 text-yellow-500 text-[9px] font-black uppercase rounded-lg border border-yellow-500/20 hover:bg-yellow-500 hover:text-black transition-all">Transfer Ownership</button>
-                 <button @click="handleKick(member.user.id)" class="px-3 py-1.5 bg-red-500/10 text-red-500 text-[9px] font-black uppercase rounded-lg border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">Kick Entity</button>
+                 <button @click="handleKick(member.userId)" class="px-3 py-1.5 bg-red-500/10 text-red-500 text-[9px] font-black uppercase rounded-lg border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">Kick Entity</button>
                </div>
              </div>
            </div>
