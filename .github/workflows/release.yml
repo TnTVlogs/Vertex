@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   tag:
-    name: Create tag from package.json version
+    name: Prepare tag
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
@@ -25,12 +25,12 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=v$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Check tag does not already exist
+      - name: Delete existing release and tag if present
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if git rev-parse "${{ steps.get_version.outputs.version }}" >/dev/null 2>&1; then
-            echo "Tag ${{ steps.get_version.outputs.version }} already exists. Bump version in apps/desktop/package.json first."
-            exit 1
-          fi
+          VERSION="${{ steps.get_version.outputs.version }}"
+          gh release delete "$VERSION" --yes --cleanup-tag 2>/dev/null || true
 
       - name: Create and push tag
         run: |
