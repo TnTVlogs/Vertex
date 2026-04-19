@@ -2,8 +2,12 @@ import { defineStore } from 'pinia';
 import { useAuthStore } from '../authStore';
 import { User } from '@shared/models';
 import { FriendRequest, FriendResponse } from './socketStore';
-import { apiFetch } from '../../utils/api';
 import { ENV } from '../../utils/env';
+
+function authHeaders(): Record<string, string> {
+    const token = useAuthStore().token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export const useFriendStore = defineStore('friend', {
     state: () => ({
@@ -16,11 +20,14 @@ export const useFriendStore = defineStore('friend', {
     actions: {
         async fetchFriends(limit = 50, cursor?: string) {
             const authStore = useAuthStore();
-            if (!authStore.user) return;
+            if (!authStore.user || !authStore.token) return;
             try {
                 const params = new URLSearchParams({ limit: String(limit) });
                 if (cursor) params.set('cursor', cursor);
-                const res = await fetch(`${ENV.API_URL}/social/friends/${authStore.user.id}?${params}`);
+                const res = await fetch(
+                    `${ENV.API_URL}/social/friends/${authStore.user.id}?${params}`,
+                    { headers: authHeaders() }
+                );
                 if (res.ok) {
                     const data = await res.json();
                     if (cursor) {
@@ -37,10 +44,12 @@ export const useFriendStore = defineStore('friend', {
 
         async fetchRequests() {
             const authStore = useAuthStore();
-            if (!authStore.user) return;
+            if (!authStore.user || !authStore.token) return;
             try {
-                const url = `${ENV.API_URL}/social/requests/${authStore.user.id}`;   
-                const res = await fetch(url);
+                const res = await fetch(
+                    `${ENV.API_URL}/social/requests/${authStore.user.id}`,
+                    { headers: authHeaders() }
+                );
                 if (res.ok) {
                     this.friendRequests = await res.json();
                 }
@@ -49,14 +58,14 @@ export const useFriendStore = defineStore('friend', {
             }
         },
 
-        async respondToRequest(requestId: string, status: 'accepted' | 'declined') { 
+        async respondToRequest(requestId: string, status: 'accepted' | 'declined') {
             if (this.loadingRequests.has(requestId)) return;
             this.loadingRequests.add(requestId);
             try {
-                const res = await fetch(`${ENV.API_URL}/social/request/respond`, {   
+                const res = await fetch(`${ENV.API_URL}/social/request/respond`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ requestId, status })
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify({ requestId, status }),
                 });
                 if (res.ok) {
                     await this.fetchRequests();
@@ -68,6 +77,7 @@ export const useFriendStore = defineStore('friend', {
                 this.loadingRequests.delete(requestId);
             }
         },
+
         updatePresence(userId: string, status: string) {
             const friend = this.friends.find((f: User) => f.id === userId);
             if (friend) friend.status = status as any;

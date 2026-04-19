@@ -83,7 +83,7 @@
                 msg.status === 'sending' ? 'opacity-50 cursor-wait' : ''
               ]"
             >
-              <div v-if="msg.content" v-html="formatMessage(msg.content)"></div>
+              <div v-html="formatMessage(msg.content || '')"></div>
 
               <!-- Attachment -->
               <a
@@ -91,10 +91,11 @@
                 :href="msg.attachmentUrl"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="flex items-center space-x-2 mt-1 text-[10px] font-bold underline opacity-80 hover:opacity-100 transition-opacity"
+                class="flex items-center space-x-2 mt-2 px-3 py-2 rounded-xl bg-black/20 hover:bg-black/30 transition-colors max-w-xs group/att"
               >
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
-                <span>{{ msg.attachmentUrl.split('/').pop() }}</span>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="shrink-0 opacity-70"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+                <span class="text-[11px] font-bold truncate opacity-80 group-hover/att:opacity-100">{{ attachmentName(msg.attachmentUrl) }}</span>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" class="shrink-0 opacity-50 group-hover/att:opacity-100"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
               </a>
 
               <!-- Status Indicators -->
@@ -135,6 +136,16 @@ const messageStore = useMessageStore()
 
 const vListRef = ref<InstanceType<typeof VList> | null>(null)
 const sortedMessages = computed((): Message[] => chatStore.sortedMessages)
+
+function attachmentName(url: string): string {
+  const ext = url.split('.').pop()?.toLowerCase() ?? ''
+  const typeMap: Record<string, string> = {
+    pdf: 'PDF Document', txt: 'Text File',
+    mp4: 'Video', webm: 'Video',
+    jpg: 'Image', jpeg: 'Image', png: 'Image', gif: 'Image', webp: 'Image',
+  }
+  return typeMap[ext] ? `${typeMap[ext]} (.${ext})` : `Attachment (.${ext || '?'})`
+}
 
 function formatMessage(text: string) {
   if (!text) return ''
