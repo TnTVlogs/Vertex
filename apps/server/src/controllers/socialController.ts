@@ -80,9 +80,11 @@ export const socialController = {
 
     async getFriends(req: Request, res: Response) {
         const userId = req.params.userId as string;
+        const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 100);
+        const cursor = req.query.cursor as string | undefined;
         try {
-            const friends = await socialService.getFriends(userId);
-            res.json(friends);
+            const result = await socialService.getFriends(userId, limit, cursor);
+            res.json(result);
         } catch (error) {
             logger.error({ err: error }, 'getFriends error');
             res.status(500).json({ error: 'Internal server error' });

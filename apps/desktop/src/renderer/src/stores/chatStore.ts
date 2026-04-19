@@ -20,7 +20,6 @@ export const useChatStore = defineStore('chat', {
         friendRequests: () => useFriendStore().friendRequests,
         servers: () => useServerStore().servers,
         channels: () => useServerStore().channels,
-        socket: () => useSocketStore().socket,
     },
 
     actions: {

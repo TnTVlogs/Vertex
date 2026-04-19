@@ -10,16 +10,25 @@ export const useFriendStore = defineStore('friend', {
         friends: [] as User[],
         friendRequests: [] as FriendRequest[],
         loadingRequests: new Set<string>(),
+        friendsNextCursor: null as string | null,
     }),
 
     actions: {
-        async fetchFriends() {
+        async fetchFriends(limit = 50, cursor?: string) {
             const authStore = useAuthStore();
             if (!authStore.user) return;
             try {
-                const res = await fetch(`${ENV.API_URL}/social/friends/${authStore.user.id}`);
+                const params = new URLSearchParams({ limit: String(limit) });
+                if (cursor) params.set('cursor', cursor);
+                const res = await fetch(`${ENV.API_URL}/social/friends/${authStore.user.id}?${params}`);
                 if (res.ok) {
-                    this.friends = await res.json();
+                    const data = await res.json();
+                    if (cursor) {
+                        this.friends.push(...data.friends);
+                    } else {
+                        this.friends = data.friends;
+                    }
+                    this.friendsNextCursor = data.nextCursor;
                 }
             } catch (e) {
                 console.error('Error fetching friends:', e);

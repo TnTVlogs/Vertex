@@ -8,8 +8,7 @@ import logger from '../utils/logger';
 // Middleware that enforces per-tier message length and daily quota limits.
 // Must be used AFTER requireAuth and requireActive.
 export const checkMessageLimits = async (req: AuthRequest, res: Response, next: NextFunction) => {
-    const userId = req.user?.userId;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.userId;
 
     const { content } = req.body;
 

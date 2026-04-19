@@ -18,3 +18,15 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+if (process.env.NODE_ENV === 'production') {
+    const warnings: string[] = [];
+    if (env.ALLOWED_ORIGINS === '') warnings.push('ALLOWED_ORIGINS is empty — CORS will block all browser origins');
+    if (env.DATABASE_URL.includes('localhost') || env.DATABASE_URL.includes('127.0.0.1'))
+        warnings.push('DATABASE_URL points to localhost — use a remote DB in production');
+    if (env.REDIS_URL.includes('localhost') || env.REDIS_URL.includes('127.0.0.1'))
+        warnings.push('REDIS_URL points to localhost — use a remote Redis in production');
+    if (warnings.length > 0) {
+        console.warn(`\n[Vertex] Production config warnings:\n${warnings.map(w => `  ⚠ ${w}`).join('\n')}\n`);
+    }
+}

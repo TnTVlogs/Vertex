@@ -4,11 +4,7 @@ import prisma from '../services/prisma';
 
 export const requireServerOwner = async (req: AuthRequest, res: Response, next: NextFunction) => {
     const serverId = req.params.id as string;
-    const userId = req.user?.userId;
-
-    if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
+    const userId = req.user.userId;
 
     try {
         const server = await prisma.server.findUnique({

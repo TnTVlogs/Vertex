@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../authStore';
 import { Message } from '@shared/models';
 import { ENV } from '../../utils/env';
+import { notificationService } from '../../services/notificationService';
 
 export interface FriendRequest {
     id: string;
@@ -19,6 +20,7 @@ export interface FriendResponse {
 export const useSocketStore = defineStore('socket', {
     state: () => ({
         socket: null as Socket | null,
+        typingUsers: {} as Record<string, { channelId?: string; recipientId?: string }>,
     }),
 
     actions: {
@@ -46,13 +48,46 @@ export const useSocketStore = defineStore('socket', {
                             this.socket?.emit('join-channel', activeChannelId);
                         }
                     }
+                    notificationService.requestPermission();
                 });
 
-                this.socket.on('message', callbacks.onMessage);
+                this.socket.on('message', (msg: Message) => {
+                    callbacks.onMessage(msg);
+                    const currentUserId = authStore.user?.id;
+                    if (msg.authorId !== currentUserId) {
+                        const sender = (msg as any).author?.username ?? 'Someone';
+                        notificationService.notify(`New message from ${sender}`, msg.content);
+                    }
+                });
                 this.socket.on('presence-update', callbacks.onPresenceUpdate);
-                this.socket.on('friend-request', callbacks.onFriendRequest);
+                this.socket.on('friend-request', (request: FriendRequest) => {
+                    callbacks.onFriendRequest(request);
+                    const from = request.from_username ?? 'Someone';
+                    notificationService.notify('Friend Request', `${from} sent you a friend request`);
+                });
                 this.socket.on('friend-response', callbacks.onFriendResponse);
+
+                this.socket.on('typing', (data: { userId: string; channelId?: string; recipientId?: string }) => {
+                    this.typingUsers[data.userId] = { channelId: data.channelId, recipientId: data.recipientId };
+                });
+                this.socket.on('stop-typing', (data: { userId: string }) => {
+                    delete this.typingUsers[data.userId];
+                });
             }
+        },
+
+        joinChannel(channelId: string) {
+            this.socket?.emit('join-channel', channelId);
+        },
+
+        emitTyping(channelId?: string | null, recipientId?: string | null) {
+            if (!this.socket) return;
+            this.socket.emit('typing', { channelId: channelId ?? undefined, recipientId: recipientId ?? undefined });
+        },
+
+        emitStopTyping(channelId?: string | null, recipientId?: string | null) {
+            if (!this.socket) return;
+            this.socket.emit('stop-typing', { channelId: channelId ?? undefined, recipientId: recipientId ?? undefined });
         },
 
         sendMessage(
@@ -76,7 +111,11 @@ export const useSocketStore = defineStore('socket', {
                 };
 
                 this.socket.emit('send-message', payload, (response: any) => {
-                    resolve(response);
+                    if (response?.success === false && response?.error?.message) {
+                        resolve({ status: 'error', error: response.error.message });
+                    } else {
+                        resolve(response);
+                    }
                 });
             });
         }

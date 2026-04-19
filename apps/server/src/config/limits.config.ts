@@ -8,20 +8,24 @@ export type Tier = 'BASIC' | 'PRO' | 'VIP';
 export interface TierLimits {
     maxDailyMessages: number;
     maxMessageLength: number;
+    maxServersPerUser: number;
 }
 
 export const TIER_LIMITS: Record<Tier, TierLimits> = {
     BASIC: {
         maxDailyMessages: 200,
         maxMessageLength: 200,
+        maxServersPerUser: 1,
     },
     PRO: {
         maxDailyMessages: 400,
         maxMessageLength: 400,
+        maxServersPerUser: 3,
     },
     VIP: {
         maxDailyMessages: 500,
         maxMessageLength: 500,
+        maxServersPerUser: 5,
     },
 };
 

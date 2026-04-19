@@ -1,7 +1,24 @@
 import prisma from './prisma';
+import redisClient from './redisService';
+import { Tier } from '../config/limits.config';
+import { getLimits } from './tierService';
+
+const PREVIEW_CACHE_TTL = 300; // 5 minutes
 
 export const serverService = {
     async createServer(name: string, ownerId: string) {
+        // Enforce per-tier server limit before creating
+        const owner = await prisma.user.findUnique({
+            where: { id: ownerId },
+            select: { tier: true },
+        });
+        const tier = (owner?.tier as Tier) ?? 'BASIC';
+        const limits = await getLimits(tier);
+        const count = await prisma.server.count({ where: { ownerId } });
+        if (count >= limits.maxServersPerUser) {
+            throw new Error(`Server limit reached. Your ${tier} tier allows up to ${limits.maxServersPerUser} server(s).`);
+        }
+
         // We do this in a transaction to ensure all core bits are created
         return prisma.$transaction(async (tx) => {
             const server = await tx.server.create({
@@ -83,42 +100,50 @@ export const serverService = {
     },
 
     async joinServerByCode(inviteCode: string, userId: string) {
-        const server = await prisma.server.findUnique({
-            where: { inviteCode }
-        });
+        return prisma.$transaction(async (tx) => {
+            const server = await tx.server.findUnique({
+                where: { inviteCode }
+            });
 
-        if (!server) {
-            throw new Error('Invalid invite code');
-        }
+            if (!server) {
+                throw new Error('Invalid invite code');
+            }
 
-        if (server.inviteExpiresAt && server.inviteExpiresAt < new Date()) {
-            throw new Error('This invite link has expired');
-        }
+            if (server.inviteExpiresAt && server.inviteExpiresAt < new Date()) {
+                throw new Error('This invite link has expired');
+            }
 
-        // Check if already a member
-        const existingMember = await prisma.member.findUnique({
-            where: {
-                serverId_userId: {
-                    serverId: server.id,
-                    userId
+            const existingMember = await tx.member.findUnique({
+                where: {
+                    serverId_userId: {
+                        serverId: server.id,
+                        userId
+                    }
                 }
-            }
-        });
+            });
 
-        if (existingMember) {
-            throw new Error('You are already a member of this server');
-        }
-
-        return prisma.member.create({
-            data: {
-                serverId: server.id,
-                userId,
-                role: 'member'
+            if (existingMember) {
+                if (existingMember.isBanned) throw new Error('You are banned from this server');
+                throw new Error('You are already a member of this server');
             }
+
+            return tx.member.create({
+                data: {
+                    serverId: server.id,
+                    userId,
+                    role: 'member'
+                }
+            });
         });
     },
 
     async getPreviewByInviteCode(inviteCode: string) {
+        const cacheKey = `preview:${inviteCode}`;
+        if (redisClient.isOpen) {
+            const cached = await redisClient.get(cacheKey);
+            if (cached) return JSON.parse(cached);
+        }
+
         const server = await prisma.server.findUnique({
             where: { inviteCode },
             include: {
@@ -139,11 +164,34 @@ export const serverService = {
             throw new Error('This invite link has expired');
         }
 
-        return {
+        const preview = {
             name: server.name,
             ownerUsername: server.owner?.username,
             memberCount: server._count.members,
             expiresAt: server.inviteExpiresAt?.toISOString() ?? null
         };
-    }
+
+        if (redisClient.isOpen) {
+            await redisClient.setEx(cacheKey, PREVIEW_CACHE_TTL, JSON.stringify(preview));
+        }
+
+        return preview;
+    },
+
+    async getChannelById(channelId: string) {
+        return prisma.channel.findUnique({
+            where: { id: channelId },
+            select: { id: true, serverId: true },
+        });
+    },
+
+    async cleanupExpiredInvites() {
+        return prisma.server.updateMany({
+            where: {
+                inviteCode: { not: null },
+                inviteExpiresAt: { lt: new Date() },
+            },
+            data: { inviteCode: null, inviteExpiresAt: null },
+        });
+    },
 };

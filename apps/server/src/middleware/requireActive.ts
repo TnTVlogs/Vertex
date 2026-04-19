@@ -6,8 +6,7 @@ import logger from '../utils/logger';
 // Middleware that ensures the authenticated user has ACTIVE status.
 // Must be used AFTER requireAuth so req.user is guaranteed to be set.
 export const requireActive = async (req: AuthRequest, res: Response, next: NextFunction) => {
-    const userId = req.user?.userId;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.userId;
 
     try {
         const user = await prisma.user.findUnique({

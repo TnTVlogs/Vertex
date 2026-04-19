@@ -15,7 +15,7 @@
           ref="chatInput"
           v-model="messageText"
           @keydown.enter.exact.prevent="handleSend"
-          @input="autoResize"
+          @input="autoResize(); handleTyping()"
           rows="1"
           :placeholder="i18n.t('chat.placeholder')"
           class="flex-1 bg-transparent border-none outline-none resize-none px-4 py-2 text-sm font-medium text-[var(--v-text-primary)] tracking-wide overflow-y-auto max-h-32 min-h-[1.5em] select-text placeholder:text-[var(--v-text-secondary)] placeholder:opacity-50"
@@ -35,7 +35,7 @@
           </button>
           <button
             @click="handleSend"
-            :disabled="isOverLimit || charCount === 0"
+            :disabled="isOverLimit || charCount === 0 || isSending"
             class="px-4 py-2 rounded-xl vertex-gradient text-[var(--v-bg-base)] text-[10px] font-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed"
           >
             {{ i18n.t('chat.send') }}
@@ -52,6 +52,7 @@ import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import { useMessageStore } from '../stores/domain/messageStore'
 import { useI18nStore } from '../stores/i18nStore'
+import { useSocketStore } from '../stores/domain/socketStore'
 import EmojiPicker from './EmojiPicker.vue'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -59,11 +60,15 @@ const chatStore = useChatStore()
 const authStore = useAuthStore()
 const messageStore = useMessageStore()
 const i18n = useI18nStore()
+const socketStore = useSocketStore()
 
 const showEmojiPicker = ref(false)
 const chatInput = ref<HTMLTextAreaElement | null>(null)
 const inputContainer = ref<HTMLElement | null>(null)
 const messageText = ref('')
+const isSending = ref(false)
+let typingTimeout: ReturnType<typeof setTimeout> | null = null
+let isTyping = false
 
 const TIER_LIMITS: Record<string, number> = { BASIC: 200, PRO: 400, VIP: 500 }
 const tierLimit = computed(() => {
@@ -80,10 +85,28 @@ function autoResize() {
   el.style.height = Math.min(el.scrollHeight, 128) + 'px'
 }
 
+function handleTyping() {
+  if (!isTyping) {
+    isTyping = true
+    socketStore.emitTyping(chatStore.activeChannelId, chatStore.activeRecipientId)
+  }
+  if (typingTimeout) clearTimeout(typingTimeout)
+  typingTimeout = setTimeout(() => {
+    isTyping = false
+    socketStore.emitStopTyping(chatStore.activeChannelId, chatStore.activeRecipientId)
+  }, 2000)
+}
+
 async function handleSend() {
-  if (isOverLimit.value) return
+  if (isOverLimit.value || isSending.value) return
   const text = messageText.value.trim()
   if (text && authStore.user) {
+    isSending.value = true
+    if (typingTimeout) clearTimeout(typingTimeout)
+    if (isTyping) {
+      isTyping = false
+      socketStore.emitStopTyping(chatStore.activeChannelId, chatStore.activeRecipientId)
+    }
     const tempId = uuidv4()
 
     // Add optimistically to UI
@@ -114,6 +137,8 @@ async function handleSend() {
       }
     } catch (e) {
       messageStore.updateMessageStatus(tempId, 'error')
+    } finally {
+      isSending.value = false
     }
   }
 }

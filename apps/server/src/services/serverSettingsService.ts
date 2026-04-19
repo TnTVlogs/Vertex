@@ -110,5 +110,43 @@ export const serverSettingsService = {
         return prisma.server.delete({
             where: { id: serverId }
         });
-    }
+    },
+
+    async muteMember(serverId: string, userId: string, mutedUntil?: Date | null) {
+        return prisma.member.update({
+            where: { serverId_userId: { serverId, userId } },
+            data: {
+                isMuted: true,
+                mutedUntil: mutedUntil ?? null,
+            },
+        });
+    },
+
+    async unmuteMember(serverId: string, userId: string) {
+        return prisma.member.update({
+            where: { serverId_userId: { serverId, userId } },
+            data: { isMuted: false, mutedUntil: null },
+        });
+    },
+
+    async banMember(serverId: string, userId: string) {
+        return prisma.member.update({
+            where: { serverId_userId: { serverId, userId } },
+            data: { isBanned: true },
+        });
+    },
+
+    async unbanMember(serverId: string, userId: string) {
+        return prisma.member.update({
+            where: { serverId_userId: { serverId, userId } },
+            data: { isBanned: false },
+        });
+    },
+
+    async getMemberStatus(serverId: string, userId: string) {
+        return prisma.member.findUnique({
+            where: { serverId_userId: { serverId, userId } },
+            select: { isMuted: true, mutedUntil: true, isBanned: true },
+        });
+    },
 };

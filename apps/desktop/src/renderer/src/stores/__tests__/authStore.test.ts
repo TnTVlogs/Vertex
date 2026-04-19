@@ -16,7 +16,7 @@ vi.mock('../../utils/environment', () => ({
 }))
 
 // Mock fetch
-global.fetch = vi.fn()
+vi.stubGlobal('fetch', vi.fn())
 
 describe('authStore', () => {
   beforeEach(() => {
@@ -56,7 +56,7 @@ describe('authStore', () => {
 
   it('should logout successfully', async () => {
     const store = useAuthStore()
-    store.user = { id: '1', username: 'test', email: 'test@test.com', status: 'ACTIVE', tier: 'BASIC', createdAt: new Date() }
+    store.user = { id: '1', username: 'test', email: 'test@test.com', status: 'online' }
     
     ;(fetch as any).mockResolvedValue({ ok: true })
 

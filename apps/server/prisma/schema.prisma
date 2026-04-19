@@ -96,6 +96,7 @@ model Server {
   channels  Channel[]
   members   Member[]
 
+  @@index([inviteExpiresAt])
   @@map("servers")
 }
 
@@ -112,16 +113,28 @@ model Channel {
 }
 
 model Member {
-  id        String     @id @default(uuid())
-  serverId  String     @map("server_id")
-  userId    String     @map("user_id")
-  role      MemberRole @default(member)
-  
+  id         String     @id @default(uuid())
+  serverId   String     @map("server_id")
+  userId     String     @map("user_id")
+  role       MemberRole @default(member)
+  isMuted    Boolean    @default(false) @map("is_muted")
+  mutedUntil DateTime?  @map("muted_until")
+  isBanned   Boolean    @default(false) @map("is_banned")
+
   server    Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([serverId, userId])
   @@map("members")
+}
+
+model TierConfig {
+  tier              UserTier @id
+  maxDailyMessages  Int      @map("max_daily_messages")
+  maxMessageLength  Int      @map("max_message_length")
+  maxServersPerUser Int      @map("max_servers_per_user")
+
+  @@map("tier_configs")
 }
 
 model Message {
@@ -132,6 +145,7 @@ model Message {
   channelId     String?   @map("channel_id")
   recipientId   String?   @map("recipient_id")
   createdAt     DateTime  @default(now()) @map("created_at")
+  deletedAt     DateTime? @map("deleted_at")
 
   author      User      @relation("MessageAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   channel     Channel?  @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -142,5 +156,6 @@ model Message {
   // 2. Daily count: WHERE author_id = ? AND created_at >= CURDATE()
   @@index([channelId, createdAt])
   @@index([authorId, createdAt])
+  @@fulltext([content])
   @@map("messages")
 }

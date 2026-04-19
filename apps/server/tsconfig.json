@@ -8,7 +8,6 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
-        "baseUrl": ".",
         "paths": {
             "@shared/*": [
                 "../../packages/shared/*"
@@ -23,6 +22,8 @@
     "exclude": [
         "node_modules",
         "dist",
-        "prisma.config.ts"
+        "prisma.config.ts",
+        "vitest.config.ts",
+        "vitest.e2e.config.ts"
     ]
 }

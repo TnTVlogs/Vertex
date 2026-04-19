@@ -98,5 +98,54 @@ export const serverSettingsController = {
             logger.error({ err: error }, 'deleteServer error');
             res.status(500).json({ error: 'Internal server error' });
         }
-    }
+    },
+
+    async muteMember(req: Request, res: Response) {
+        const serverId = req.params.id as string;
+        const userId = req.params.userId as string;
+        const { mutedUntil } = req.body;
+        try {
+            await serverSettingsService.muteMember(serverId, userId, mutedUntil ? new Date(mutedUntil) : null);
+            res.json({ message: 'Member muted' });
+        } catch (error) {
+            logger.error({ err: error }, 'muteMember error');
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    async unmuteMember(req: Request, res: Response) {
+        const serverId = req.params.id as string;
+        const userId = req.params.userId as string;
+        try {
+            await serverSettingsService.unmuteMember(serverId, userId);
+            res.json({ message: 'Member unmuted' });
+        } catch (error) {
+            logger.error({ err: error }, 'unmuteMember error');
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    async banMember(req: Request, res: Response) {
+        const serverId = req.params.id as string;
+        const userId = req.params.userId as string;
+        try {
+            await serverSettingsService.banMember(serverId, userId);
+            res.json({ message: 'Member banned' });
+        } catch (error) {
+            logger.error({ err: error }, 'banMember error');
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
+
+    async unbanMember(req: Request, res: Response) {
+        const serverId = req.params.id as string;
+        const userId = req.params.userId as string;
+        try {
+            await serverSettingsService.unbanMember(serverId, userId);
+            res.json({ message: 'Member unbanned' });
+        } catch (error) {
+            logger.error({ err: error }, 'unbanMember error');
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
 };

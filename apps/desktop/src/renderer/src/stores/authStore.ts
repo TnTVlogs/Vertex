@@ -14,12 +14,12 @@ export const useAuthStore = defineStore('auth', () => {
     async function refreshAccessToken(): Promise<boolean> {
         try {
             const refreshToken = await SecureStorage.getRefreshToken()
-            if (!refreshToken || !user.value?.id) return false
+            if (!refreshToken) return false
 
             const res = await fetch(`${ENV.API_URL}/auth/refresh`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken, userId: user.value.id })
+                body: JSON.stringify({ refreshToken })
             })
 
             if (!res.ok) {
@@ -85,16 +85,10 @@ export const useAuthStore = defineStore('auth', () => {
             const refreshToken = await SecureStorage.getRefreshToken()
             if (!refreshToken) return
 
-            const savedUserId = localStorage.getItem('vertex_uid')
-            if (!savedUserId) {
-                await clearAll()
-                return
-            }
-
             const res = await fetch(`${ENV.API_URL}/auth/refresh`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken, userId: savedUserId })
+                body: JSON.stringify({ refreshToken })
             })
 
             if (!res.ok) {
@@ -110,7 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
             }
 
             const meRes = await fetch(`${ENV.API_URL}/auth/me`, {
-                headers: { Authorization: `Bearer ${accessToken}` }
+                headers: { Authorization: `Bearer ${token.value}` }
             })
 
             if (meRes.ok) {
@@ -154,22 +148,21 @@ export const useAuthStore = defineStore('auth', () => {
             await SecureStorage.saveRefreshToken(refreshToken)
         }
 
-        // Guardar userId per poder fer bootstrap sense credencials
-        localStorage.setItem('vertex_uid', data.user.id)
     }
 
     // ── LOGOUT ────────────────────────────────────────────────────────────────
     async function logout() {
-        if (user.value?.id) {
-            try {
+        try {
+            const refreshToken = await SecureStorage.getRefreshToken()
+            if (refreshToken) {
                 await fetch(`${ENV.API_URL}/auth/logout`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user.value.id })
+                    body: JSON.stringify({ refreshToken })
                 })
-            } catch (e) {
-                console.error('Server logout failed:', e)
             }
+        } catch (e) {
+            console.error('Server logout failed:', e)
         }
         await clearAll()
     }
@@ -178,7 +171,6 @@ export const useAuthStore = defineStore('auth', () => {
     async function clearAll() {
         user.value = null
         token.value = null
-        localStorage.removeItem('vertex_uid')
         await SecureStorage.clearToken()
         await SecureStorage.clearRefreshToken()
     }

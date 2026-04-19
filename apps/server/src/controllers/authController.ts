@@ -73,7 +73,7 @@ export const authController = {
             const refreshToken = uuidv4();
 
             if (redisClient.isOpen) {
-                await redisClient.set(`refresh:${user.id}`, refreshToken, {
+                await redisClient.set(`rt:${refreshToken}`, user.id, {
                     EX: REFRESH_TOKEN_TTL_SECONDS
                 });
             }
@@ -90,10 +90,10 @@ export const authController = {
     },
 
     async refresh(req: Request, res: Response) {
-        const { refreshToken, userId } = req.body;
+        const { refreshToken } = req.body;
 
-        if (!refreshToken || !userId) {
-            return res.status(400).json({ error: 'Missing refreshToken or userId' });
+        if (!refreshToken) {
+            return res.status(400).json({ error: 'Missing refreshToken' });
         }
 
         try {
@@ -101,9 +101,9 @@ export const authController = {
                 return res.status(503).json({ error: 'Auth service temporarily unavailable' });
             }
 
-            const storedToken = await redisClient.get(`refresh:${userId}`);
+            const userId = await redisClient.get(`rt:${refreshToken}`);
 
-            if (!storedToken || storedToken !== refreshToken) {
+            if (!userId) {
                 return res.status(401).json({ error: 'Invalid or expired refresh token' });
             }
 
@@ -113,9 +113,10 @@ export const authController = {
                 { expiresIn: '15m' }
             );
 
-            // Rotate: replace old token with new one
+            // Rotate: delete old token, issue new one
             const newRefreshToken = uuidv4();
-            await redisClient.set(`refresh:${userId}`, newRefreshToken, {
+            await redisClient.del(`rt:${refreshToken}`);
+            await redisClient.set(`rt:${newRefreshToken}`, userId, {
                 EX: REFRESH_TOKEN_TTL_SECONDS
             });
 
@@ -127,16 +128,16 @@ export const authController = {
     },
 
     async logout(req: Request, res: Response) {
-        const { userId } = req.body;
-        if (userId && redisClient.isOpen) {
-            await redisClient.del(`refresh:${userId}`);
+        const { refreshToken } = req.body;
+        if (refreshToken && redisClient.isOpen) {
+            await redisClient.del(`rt:${refreshToken}`);
         }
         res.json({ ok: true });
     },
 
     async me(req: AuthRequest, res: Response) {
         try {
-            const user = await authService.getUserById(req.user!.userId);
+            const user = await authService.getUserById(req.user.userId);
             if (!user) return res.status(404).json({ error: 'User not found' });
             res.json({ user });
         } catch (error) {

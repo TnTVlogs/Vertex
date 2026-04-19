@@ -91,17 +91,23 @@ export const socialService = {
         });
     },
 
-    async getFriends(userId: string) {
+    async getFriends(userId: string, limit = 50, cursor?: string) {
         const friendships = await prisma.friendship.findMany({
             where: { OR: [{ user1Id: userId }, { user2Id: userId }] },
             include: {
                 user1: { select: { id: true, username: true, status: true, avatarUrl: true } },
                 user2: { select: { id: true, username: true, status: true, avatarUrl: true } },
             },
+            orderBy: { id: 'asc' },
+            take: limit + 1,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         });
 
-        // Return the "other" user in each friendship
-        type FriendshipWithUsers = (typeof friendships)[number];
-        return friendships.map((f: FriendshipWithUsers) => (f.user1Id === userId ? f.user2 : f.user1));
+        const hasMore = friendships.length > limit;
+        const page = hasMore ? friendships.slice(0, limit) : friendships;
+        type FriendshipWithUsers = (typeof page)[number];
+        const friends = page.map((f: FriendshipWithUsers) => (f.user1Id === userId ? f.user2 : f.user1));
+        const nextCursor = hasMore ? page[page.length - 1].id : null;
+        return { friends, nextCursor };
     },
 };

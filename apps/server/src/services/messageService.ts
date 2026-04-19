@@ -16,6 +16,7 @@ export const messageService = {
         const rows = await prisma.message.findMany({
             where: {
                 channelId,
+                deletedAt: null,
                 ...(before ? { createdAt: { lt: before } } : {}),
             },
             orderBy: { createdAt: 'desc' },
@@ -34,6 +35,7 @@ export const messageService = {
                     { authorId: userId1, recipientId: userId2 },
                     { authorId: userId2, recipientId: userId1 },
                 ],
+                deletedAt: null,
                 ...(before ? { createdAt: { lt: before } } : {}),
             },
             orderBy: { createdAt: 'desc' },
@@ -41,6 +43,30 @@ export const messageService = {
             include: { author: { select: authorSelect } },
         });
         return rows.reverse();
+    },
+
+    async softDeleteMessage(messageId: string, requesterId: string, isAdmin: boolean) {
+        const message = await prisma.message.findUnique({ where: { id: messageId } });
+        if (!message) throw new Error('Message not found');
+        if (!isAdmin && message.authorId !== requesterId) throw new Error('Forbidden');
+        return prisma.message.update({
+            where: { id: messageId },
+            data: { deletedAt: new Date() },
+        });
+    },
+
+    async searchMessages(channelId: string, query: string, limit = DEFAULT_LIMIT) {
+        const safeLimit = Math.min(limit, MAX_LIMIT);
+        return prisma.message.findMany({
+            where: {
+                channelId,
+                deletedAt: null,
+                content: { search: query },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: safeLimit,
+            include: { author: { select: authorSelect } },
+        });
     },
 
     async countTodayMessages(authorId: string): Promise<number> {

@@ -1,22 +1,46 @@
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { setPresence, publishMessage, refreshPresenceTTL } from '../services/redisService';
+import { v4 as uuidv4 } from 'uuid';
+import { setPresence, refreshPresenceTTL } from '../services/redisService';
+import redisClient from '../services/redisService';
 import { messageService } from '../services/messageService';
 import { serverService } from '../services/serverService';
-import { TIER_LIMITS, Tier } from '../config/limits.config';
+import { serverSettingsService } from '../services/serverSettingsService';
+import { Tier } from '../config/limits.config';
+import { getLimits } from '../services/tierService';
 import logger from '../utils/logger';
 
 const socketToUser = new Map<string, string>();
+const userToSockets = new Map<string, Set<string>>();
 
-// In-memory rate limit: 20 messages/minute per socket
-const socketRateLimits = new Map<string, { count: number; resetAt: number }>();
+function addUserSocket(userId: string, socketId: string) {
+    if (!userToSockets.has(userId)) userToSockets.set(userId, new Set());
+    userToSockets.get(userId)!.add(socketId);
+}
 
-function checkSocketRateLimit(socketId: string): boolean {
+function removeUserSocket(userId: string, socketId: string) {
+    const sockets = userToSockets.get(userId);
+    if (!sockets) return;
+    sockets.delete(socketId);
+    if (sockets.size === 0) userToSockets.delete(userId);
+}
+
+// Rate limit: 20 messages/minute per socket — Redis-backed, falls back to in-memory
+const socketRateLimitsLocal = new Map<string, { count: number; resetAt: number }>();
+
+async function checkSocketRateLimit(socketId: string): Promise<boolean> {
+    if (redisClient.isOpen) {
+        const key = `rl:${socketId}`;
+        const count = await redisClient.incr(key);
+        if (count === 1) await redisClient.expire(key, 60);
+        return count <= 20;
+    }
+    // Fallback: in-memory
     const now = Date.now();
-    const entry = socketRateLimits.get(socketId);
+    const entry = socketRateLimitsLocal.get(socketId);
     if (!entry || now > entry.resetAt) {
-        socketRateLimits.set(socketId, { count: 1, resetAt: now + 60_000 });
+        socketRateLimitsLocal.set(socketId, { count: 1, resetAt: now + 60_000 });
         return true;
     }
     if (entry.count >= 20) return false;
@@ -50,6 +74,7 @@ export const handleSocketConnections = (io: Server) => {
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
             socket.data.userId = decoded.userId;
+            socket.data.sessionId = uuidv4();
             next();
         } catch {
             next(new Error('Invalid token'));
@@ -66,6 +91,7 @@ export const handleSocketConnections = (io: Server) => {
             }
             socket.join(`user:${userId}`);
             socketToUser.set(socket.id, userId);
+            addUserSocket(userId, socket.id);
             await setPresence(userId, 'online');
             socket.broadcast.emit('presence-update', { userId, status: 'online' });
         });
@@ -83,24 +109,31 @@ export const handleSocketConnections = (io: Server) => {
 
         socket.on('send-message', async (data, callback) => {
             const userId = socket.data.userId as string;
+            const sessionId = socket.data.sessionId as string;
+            const msgCtx = { userId, sessionId };
+
+            const socketError = (code: string, message: string) => {
+                if (callback) callback({ success: false, error: { code, message } });
+                else socket.emit('error', { code, message });
+            };
 
             // Item 3: rate limit
-            if (!checkSocketRateLimit(socket.id)) {
-                if (callback) callback({ error: 'Rate limit exceeded. Max 20 messages/minute.' });
+            if (!await checkSocketRateLimit(socket.id)) {
+                socketError('RATE_LIMIT', 'Rate limit exceeded. Max 20 messages/minute.');
                 return;
             }
 
             // Item 2: schema validation
             const parsed = sendMessageSchema.safeParse(data);
             if (!parsed.success) {
-                if (callback) callback({ error: parsed.error.errors[0]?.message ?? 'Invalid data' });
+                socketError('INVALID_DATA', parsed.error.issues[0]?.message ?? 'Invalid data');
                 return;
             }
 
             const { content, channelId, recipientId, attachmentUrl } = parsed.data;
 
             if (attachmentUrl && !isValidAttachmentUrl(attachmentUrl)) {
-                if (callback) callback({ error: 'Invalid attachment URL' });
+                socketError('INVALID_ATTACHMENT', 'Invalid attachment URL');
                 return;
             }
 
@@ -108,31 +141,47 @@ export const handleSocketConnections = (io: Server) => {
             const authorId = userId;
 
             try {
+                logger.info(msgCtx, 'send-message started');
                 const user = await messageService.getUserTierInfo(authorId);
 
                 if (!user || user.status !== 'ACTIVE') {
-                    const errorMsg = 'Compte pendent o suspès. No pots enviar missatges.';
-                    if (callback) callback({ error: errorMsg });
-                    else socket.emit('error', { message: errorMsg });
+                    socketError('ACCOUNT_SUSPENDED', 'Compte pendent o suspès. No pots enviar missatges.');
                     return;
                 }
 
                 const tier = (user.tier as Tier) ?? 'BASIC';
-                const limits = TIER_LIMITS[tier] ?? TIER_LIMITS['BASIC'];
+                const limits = await getLimits(tier);
 
                 if (content.length > limits.maxMessageLength) {
-                    const errorMsg = `El missatge supera el límit de ${limits.maxMessageLength} caràcters (Tier ${tier}).`;
-                    if (callback) callback({ error: errorMsg });
-                    else socket.emit('error', { message: errorMsg });
+                    socketError('MESSAGE_TOO_LONG', `El missatge supera el límit de ${limits.maxMessageLength} caràcters (Tier ${tier}).`);
                     return;
                 }
 
                 const todayCount = await messageService.countTodayMessages(authorId);
                 if (todayCount >= limits.maxDailyMessages) {
-                    const errorMsg = `Has superat el límit de ${limits.maxDailyMessages} missatges diaris (Tier ${tier}).`;
-                    if (callback) callback({ error: errorMsg });
-                    else socket.emit('error', { message: errorMsg });
+                    socketError('DAILY_LIMIT', `Has superat el límit de ${limits.maxDailyMessages} missatges diaris (Tier ${tier}).`);
                     return;
+                }
+
+                // Check server-level mute when sending to a channel
+                if (channelId) {
+                    const channel = await serverService.getChannelById(channelId);
+                    if (channel) {
+                        const memberStatus = await serverSettingsService.getMemberStatus(channel.serverId, authorId);
+                        if (memberStatus?.isBanned) {
+                            socketError('BANNED', 'Estàs banejar d\'aquest servidor.');
+                            return;
+                        }
+                        if (memberStatus?.isMuted) {
+                            const stillMuted = !memberStatus.mutedUntil || memberStatus.mutedUntil > new Date();
+                            if (stillMuted) {
+                                socketError('MUTED', 'Estàs silenciat en aquest servidor.');
+                                return;
+                            }
+                            // Auto-clear expired mute
+                            await serverSettingsService.unmuteMember(channel.serverId, authorId);
+                        }
+                    }
                 }
 
                 const message = await messageService.createMessage({
@@ -146,25 +195,57 @@ export const handleSocketConnections = (io: Server) => {
                 if (channelId) {
                     io.to(`channel:${channelId}`).emit('message', message);
                 } else if (recipientId) {
-                    io.to(`user:${recipientId}`).to(`user:${authorId}`).emit('message', message);
+                    const targetUserIds = [recipientId, authorId];
+                    for (const targetUserId of targetUserIds) {
+                        const sockets = userToSockets.get(targetUserId) ?? new Set();
+                        for (const socketId of sockets) {
+                            io.to(socketId).emit('message', message, (ack: unknown) => {
+                                if (!ack) logger.warn({ userId: targetUserId, messageId: message.id }, 'DM not ACKed');
+                            });
+                        }
+                    }
                 }
 
-                await publishMessage('chat-events', message);
                 await refreshPresenceTTL(authorId);
 
                 if (callback) callback({ status: 'ok', messageId: message.id });
             } catch (error) {
-                logger.error({ err: error }, 'Error saving message');
-                if (callback) callback({ error: 'Error intern en enviar el missatge.' });
-                else socket.emit('error', { message: 'Error intern en enviar el missatge.' });
+                logger.error({ ...msgCtx, err: error }, 'send-message failed');
+                socketError('INTERNAL_ERROR', 'Error intern en enviar el missatge.');
+            }
+        });
+
+        socket.on('typing', (data: { channelId?: string; recipientId?: string }) => {
+            const userId = socket.data.userId as string;
+            if (data.channelId) {
+                socket.to(`channel:${data.channelId}`).emit('typing', { userId, channelId: data.channelId });
+            } else if (data.recipientId) {
+                const recipientSockets = userToSockets.get(data.recipientId) ?? new Set();
+                for (const socketId of recipientSockets) {
+                    io.to(socketId).emit('typing', { userId, recipientId: data.recipientId });
+                }
+            }
+        });
+
+        socket.on('stop-typing', (data: { channelId?: string; recipientId?: string }) => {
+            const userId = socket.data.userId as string;
+            if (data.channelId) {
+                socket.to(`channel:${data.channelId}`).emit('stop-typing', { userId, channelId: data.channelId });
+            } else if (data.recipientId) {
+                const recipientSockets = userToSockets.get(data.recipientId) ?? new Set();
+                for (const socketId of recipientSockets) {
+                    io.to(socketId).emit('stop-typing', { userId, recipientId: data.recipientId });
+                }
             }
         });
 
         socket.on('disconnect', async () => {
-            socketRateLimits.delete(socket.id);
+            socketRateLimitsLocal.delete(socket.id);
+            if (redisClient.isOpen) redisClient.del(`rl:${socket.id}`).catch(() => {});
             const userId = socketToUser.get(socket.id);
             if (userId) {
                 socketToUser.delete(socket.id);
+                removeUserSocket(userId, socket.id);
                 await setPresence(userId, 'offline');
                 socket.broadcast.emit('presence-update', { userId, status: 'offline' });
             }

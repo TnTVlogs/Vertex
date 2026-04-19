@@ -1,14 +1,19 @@
 import { Request, Response } from 'express';
 import { serverService } from '../services/serverService';
+import { AuthRequest } from '../middleware/requireAuth';
 import logger from '../utils/logger';
 
 export const serverController = {
-    async createServer(req: Request, res: Response) {
-        const { name, ownerId } = req.body;
+    async createServer(req: AuthRequest, res: Response) {
+        const { name } = req.body;
+        const ownerId = req.user!.userId;
         try {
             const server = await serverService.createServer(name, ownerId);
             res.json(server);
-        } catch (error) {
+        } catch (error: any) {
+            if (error.message?.includes('Server limit reached')) {
+                return res.status(403).json({ error: error.message });
+            }
             logger.error({ err: error }, 'createServer error');
             res.status(500).json({ error: 'Internal server error' });
         }
