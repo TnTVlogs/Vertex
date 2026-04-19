@@ -26,24 +26,27 @@ function removeUserSocket(userId: string, socketId: string) {
     if (sockets.size === 0) userToSockets.delete(userId);
 }
 
-// Rate limit: 20 messages/minute per socket — Redis-backed, falls back to in-memory
+const SOCKET_RATE_LIMIT_MAX = 20;        // messages per window
+const SOCKET_RATE_LIMIT_WINDOW_S = 60;   // window in seconds (Redis TTL)
+const SOCKET_RATE_LIMIT_WINDOW_MS = 60_000; // window in ms (in-memory fallback)
+
 const socketRateLimitsLocal = new Map<string, { count: number; resetAt: number }>();
 
 async function checkSocketRateLimit(socketId: string): Promise<boolean> {
     if (redisClient.isOpen) {
         const key = `rl:${socketId}`;
         const count = await redisClient.incr(key);
-        if (count === 1) await redisClient.expire(key, 60);
-        return count <= 20;
+        if (count === 1) await redisClient.expire(key, SOCKET_RATE_LIMIT_WINDOW_S);
+        return count <= SOCKET_RATE_LIMIT_MAX;
     }
     // Fallback: in-memory
     const now = Date.now();
     const entry = socketRateLimitsLocal.get(socketId);
     if (!entry || now > entry.resetAt) {
-        socketRateLimitsLocal.set(socketId, { count: 1, resetAt: now + 60_000 });
+        socketRateLimitsLocal.set(socketId, { count: 1, resetAt: now + SOCKET_RATE_LIMIT_WINDOW_MS });
         return true;
     }
-    if (entry.count >= 20) return false;
+    if (entry.count >= SOCKET_RATE_LIMIT_MAX) return false;
     entry.count++;
     return true;
 }

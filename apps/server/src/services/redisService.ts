@@ -1,4 +1,5 @@
 import { createClient } from 'redis';
+import logger from '../utils/logger';
 
 const redisClient = createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -15,7 +16,7 @@ const redisClient = createClient({
 let redisErrorLogged = false;
 redisClient.on('error', (err) => {
     if (!redisErrorLogged) {
-        console.log('Redis Client Error (Suppressing further logs):', err.message);
+        logger.error({ err: err.message }, 'Redis client error (suppressing further logs)');
         redisErrorLogged = true;
     }
 });
@@ -24,10 +25,10 @@ export const connectRedis = async () => {
     try {
         if (!redisClient.isOpen) {
             await redisClient.connect();
-            console.log('Connected to Redis');
+            logger.info('Connected to Redis');
         }
     } catch (error) {
-        console.warn('Could not connect to Redis. Presence features will be limited.', error);
+        logger.warn({ err: error }, 'Could not connect to Redis. Presence features will be limited.');
     }
 };
 
@@ -39,7 +40,7 @@ export const setPresence = async (userId: string, status: string) => {
             await redisClient.set(`presence:${userId}`, status, { EX: PRESENCE_TTL });
         }
     } catch (e) {
-        console.error('Redis setPresence error:', e);
+        logger.error({ err: e }, 'Redis setPresence error');
     }
 };
 
@@ -49,7 +50,7 @@ export const refreshPresenceTTL = async (userId: string) => {
             await redisClient.expire(`presence:${userId}`, PRESENCE_TTL);
         }
     } catch (e) {
-        console.error('Redis refreshPresenceTTL error:', e);
+        logger.error({ err: e }, 'Redis refreshPresenceTTL error');
     }
 };
 
@@ -59,7 +60,7 @@ export const getPresence = async (userId: string) => {
             return await redisClient.get(`presence:${userId}`);
         }
     } catch (e) {
-        console.error('Redis getPresence error:', e);
+        logger.error({ err: e }, 'Redis getPresence error');
     }
     return null;
 };
@@ -70,7 +71,7 @@ export const publishMessage = async (channel: string, message: any) => {
             await redisClient.publish(channel, JSON.stringify(message));
         }
     } catch (e) {
-        console.error('Redis publishMessage error:', e);
+        logger.error({ err: e }, 'Redis publishMessage error');
     }
 };
 

@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './requireAuth';
 import prisma from '../services/prisma';
+import logger from '../utils/logger';
 
 export const requireServerOwner = async (req: AuthRequest, res: Response, next: NextFunction) => {
     const serverId = req.params.id as string;
@@ -22,7 +23,7 @@ export const requireServerOwner = async (req: AuthRequest, res: Response, next: 
 
         next();
     } catch (error) {
-        console.error('requireServerOwner Error:', error);
+        logger.error({ err: error }, 'requireServerOwner error');
         res.status(500).json({ error: 'Internal server error' });
     }
 };

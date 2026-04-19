@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 import { openApiSpec } from './swagger';
 import authRoutes from './routes/auth';
@@ -72,6 +73,17 @@ app.use(helmet({
 app.use(compression());
 app.use(cors(corsOptions));
 app.use(express.json());
+
+const globalRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 500,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' },
+    skip: (req) => req.path === '/api/v1/health',
+});
+
+app.use('/api/v1', globalRateLimit);
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/social', socialRoutes);
