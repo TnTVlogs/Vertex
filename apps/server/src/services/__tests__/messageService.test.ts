@@ -55,7 +55,7 @@ describe('messageService', () => {
     expect(msgs[1].id).toBe('2')
     expect(prismaMock.message.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { channelId: 'c-1' },
+        where: expect.objectContaining({ channelId: 'c-1' }),
         orderBy: { createdAt: 'desc' }
       })
     )

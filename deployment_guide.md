@@ -1,89 +1,180 @@
 # Vertex Deployment Guide
 
-This guide provides instructions for building the desktop application and deploying the server on an Ubuntu environment.
+Build the desktop app and deploy the server on Ubuntu.
 
 ## 1. Desktop Application (Windows, Mac, Linux)
 
-To generate executables and installers, follow these steps on your development machine:
+```bash
+cd apps/desktop
+npm install
+```
 
-1.  **Install Dependencies**:
-    ```bash
-    cd apps/desktop
-    npm install
-    ```
-2.  **Build and Package**:
-    - **Windows**: `npm run build:win` (Generates `.exe` in `dist/`)
-    - **Linux**: `npm run build:linux` (Generates `.AppImage` in `dist/`)
-    - **Mac**: `npm run build:mac` (Generates `.dmg` in `dist/`)
+| Platform | Command | Output |
+|---|---|---|
+| Windows | `npm run build:win` | `dist/*.exe` |
+| Linux | `npm run build:linux` | `dist/*.AppImage` |
+| macOS | `npm run build:mac` | `dist/*.dmg` |
 
-> [!NOTE]
-> Building for Mac requires a macOS machine. Building for Windows/Linux can generally be done on their respective platforms or via cross-compilation tools (though native is recommended).
+> **Note:** macOS builds require a macOS machine. Cross-compilation is not supported.
 
 ---
 
-## 2. Server Deployment (Ubuntu)
+## 2. Server Deployment (Ubuntu 22.04 / 24.04)
 
 ### Prerequisites
-- Ubuntu 22.04 or 24.04
-- Node.js v20+
-- MariaDB (or MySQL)
-- Redis
-- PM2 (`npm install -g pm2`)
 
-### Step 1: Install System Dependencies
 ```bash
 sudo apt update
-sudo apt install -y mariadb-server redis-server nodejs npm
+sudo apt install -y mariadb-server redis-server nodejs npm nginx certbot python3-certbot-nginx
+npm install -g pm2
 ```
 
-### Step 2: Database Setup
-1.  **Secure MariaDB**: `sudo mysql_secure_installation`
-2.  **Create Database**:
-    ```sql
-    CREATE DATABASE vertex;
-    CREATE USER 'vertex_user'@'localhost' IDENTIFIED BY 'your_password';
-    GRANT ALL PRIVILEGES ON vertex.* TO 'vertex_user'@'localhost';
-    FLUSH PRIVILEGES;
-    ```
-3.  **Initialize Schema**:
-    After setting up the `.env` file (see Step 3), run the following command to create tables:
-    ```bash
-    npx ts-node src/scripts/setup-db.ts
-    ```
+### Step 1: Database Setup
 
-### Step 3: Server Preparation
-1.  **Clone/Copy Code**: Transfer the `apps/server` directory to your Ubuntu server.
-2.  **Install Dependencies**:
-    ```bash
-    cd apps/server
-    npm install --omit=dev
-    ```
-3.  **Configure Environment**:
-    Create a `.env` file in `apps/server/`:
-    ```env
-    PORT=3000
-    DB_HOST=127.0.0.1
-    DB_USER=vertex_user
-    DB_PASSWORD=your_password
-    DB_NAME=vertex
-    REDIS_URL=redis://localhost:6379
-    JWT_SECRET=your_super_secret_key
-    ```
-4.  **Build the Server**:
-    ```bash
-    npm run build
-    ```
-
-### Step 4: Run with PM2
-To ensure the server stays online and restarts automatically:
 ```bash
-pm2 start dist/index.js --name "vertex-server"
+sudo mysql_secure_installation
+```
+
+```sql
+CREATE DATABASE vertex CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'vertex_user'@'localhost' IDENTIFIED BY 'your_strong_password';
+GRANT ALL PRIVILEGES ON vertex.* TO 'vertex_user'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+### Step 2: Redis Configuration
+
+Edit `/etc/redis/redis.conf`:
+
+```
+bind 127.0.0.1
+requirepass your_redis_password
+maxmemory 256mb
+maxmemory-policy allkeys-lru
+```
+
+```bash
+sudo systemctl enable redis-server
+sudo systemctl restart redis-server
+```
+
+### Step 3: Server Setup
+
+```bash
+git clone https://github.com/your-org/vertex.git /opt/vertex
+cd /opt/vertex/apps/server
+npm install --omit=dev
+```
+
+Create `/opt/vertex/apps/server/.env`:
+
+```env
+DATABASE_URL=mysql://vertex_user:your_strong_password@localhost:3306/vertex
+REDIS_URL=redis://:your_redis_password@localhost:6379
+JWT_SECRET=generate_with_openssl_rand_base64_48
+PORT=3000
+NODE_ENV=production
+ALLOWED_ORIGINS=https://yourdomain.com,app://vertex
+ALLOWED_ATTACHMENT_HOSTS=cdn.yourdomain.com
+```
+
+> **Generate JWT_SECRET:** `openssl rand -base64 48`
+
+### Step 4: Database Migrations
+
+```bash
+cd /opt/vertex/apps/server
+npx prisma migrate deploy
+```
+
+Run this command on every deployment that includes schema changes.
+
+### Step 5: Build and Start
+
+```bash
+npm run build
+pm2 start dist/index.js --name vertex-server
 pm2 save
 pm2 startup
 ```
 
+### Step 6: HTTPS with Nginx
+
+Create `/etc/nginx/sites-available/vertex`:
+
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/vertex /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+
+# Obtain SSL certificate
+sudo certbot --nginx -d yourdomain.com
+```
+
 ---
 
-## 3. Post-Deployment
-- Ensure the desktop app is configured to point to your Ubuntu server's IP/domain.
-- Check logs using `pm2 logs vertex-server`.
+## 3. Desktop Configuration
+
+Point the desktop app at your server by setting env vars before building:
+
+```env
+VITE_API_URL=https://yourdomain.com/api/v1
+VITE_SOCKET_URL=https://yourdomain.com
+```
+
+---
+
+## 4. Updating
+
+```bash
+cd /opt/vertex
+git pull
+cd apps/server
+npm install --omit=dev
+npx prisma migrate deploy
+npm run build
+pm2 restart vertex-server
+```
+
+---
+
+## 5. Operations
+
+| Task | Command |
+|---|---|
+| View logs | `pm2 logs vertex-server` |
+| Monitor processes | `pm2 monit` |
+| Restart server | `pm2 restart vertex-server` |
+| Redis CLI | `redis-cli -a your_redis_password` |
+| DB console | `mysql -u vertex_user -p vertex` |
+| Prisma Studio | `npx prisma studio` |

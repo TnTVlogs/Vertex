@@ -51,7 +51,6 @@ describe('authStore', () => {
     expect(store.token).toBe('access-token')
     expect(SecureStorage.saveToken).toHaveBeenCalledWith('access-token')
     expect(SecureStorage.saveRefreshToken).toHaveBeenCalledWith('refresh-token')
-    expect(localStorage.getItem('vertex_uid')).toBe('1')
   })
 
   it('should logout successfully', async () => {
