@@ -114,8 +114,8 @@ async function handleFileChange(e: Event) {
 function expandShortcodes() {
   const el = chatInput.value
   if (!el) return
-  const cursor = el.selectionStart ?? 0
-  const text = messageText.value
+  const text = el.value  // read directly from DOM, always current
+  const cursor = el.selectionStart ?? text.length
   const before = text.slice(0, cursor)
   const match = before.match(/:([a-z0-9_]+):$/)
   if (!match) return
@@ -123,7 +123,8 @@ function expandShortcodes() {
   const unicode = SHORTCODE_TO_UNICODE[shortcode]
   if (!unicode) return
   const start = cursor - shortcode.length
-  messageText.value = text.slice(0, start) + unicode + text.slice(cursor)
+  const newText = text.slice(0, start) + unicode + text.slice(cursor)
+  messageText.value = newText
   nextTick(() => {
     const newPos = start + unicode.length
     el.setSelectionRange(newPos, newPos)
@@ -207,11 +208,12 @@ async function handleSend() {
 function addEmoji(shortcode: string) {
   const el = chatInput.value
   if (!el) return
+  const unicode = SHORTCODE_TO_UNICODE[shortcode] ?? shortcode
   const start = el.selectionStart ?? messageText.value.length
   const end = el.selectionEnd ?? messageText.value.length
-  messageText.value = messageText.value.slice(0, start) + shortcode + messageText.value.slice(end)
+  messageText.value = messageText.value.slice(0, start) + unicode + messageText.value.slice(end)
   nextTick(() => {
-    const newPos = start + shortcode.length
+    const newPos = start + unicode.length
     el.setSelectionRange(newPos, newPos)
     el.focus()
     autoResize()
