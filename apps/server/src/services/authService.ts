@@ -37,6 +37,7 @@ export const authService = {
                 status: true,
                 tier: true,
                 avatarUrl: true,
+                isAdmin: true,
             },
         });
     },
