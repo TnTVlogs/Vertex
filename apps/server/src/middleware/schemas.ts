@@ -25,7 +25,6 @@ export const loginSchema = z.object({
 
 export const refreshSchema = z.object({
     refreshToken: z.string().uuid('Invalid refresh token'),
-    userId: z.string().uuid('Invalid user ID'),
 });
 
 // ─── Social ─────────────────────────────────────────────────────────────────
