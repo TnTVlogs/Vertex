@@ -329,7 +329,7 @@ async function handleTransferOwnership() {
             <h2 class="text-xl font-black text-white uppercase italic tracking-tighter">Transfer Ownership</h2>
             <p class="text-xs text-[var(--v-text-secondary)] mt-2 font-medium leading-relaxed">
                You are about to transfer ownership of <span class="text-white font-bold">{{ currentServer?.name }}</span> to 
-               <span class="text-[var(--v-accent)] font-bold">{{ selectedMemberForTransfer?.user.username }}</span>.
+               <span class="text-[var(--v-accent)] font-bold">{{ selectedMemberForTransfer?.username }}</span>.
                This action is permanent. You will lose all administrative control.
             </p>
           </div>

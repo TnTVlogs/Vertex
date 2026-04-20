@@ -79,7 +79,7 @@ export const authController = {
             }
 
             res.json({
-                user: { id: user.id, username: user.username, email: user.email, status: user.status, tier: user.tier },
+                user: { id: user.id, username: user.username, email: user.email, status: user.status, tier: user.tier, isAdmin: user.isAdmin },
                 accessToken,
                 refreshToken
             });

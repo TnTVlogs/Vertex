@@ -197,7 +197,8 @@ const onServerAction = async (value: string) => {
       </div>
 
       <div class="mt-auto flex flex-col items-center space-y-6 pt-4 border-t border-[var(--v-border)] w-full">
-        <button 
+        <button
+          v-if="authStore.user?.isAdmin"
           @click="navStore.setActiveView('admin')"
           class="transition-colors group"
           :class="navStore.activeView === 'admin' ? 'text-[var(--v-accent)]' : 'text-[var(--v-text-secondary)] hover:text-red-400'"
@@ -340,6 +341,7 @@ const onServerAction = async (value: string) => {
             Settings
           </button>
           <button
+            v-if="authStore.user?.isAdmin"
             @click="navStore.setActiveView('admin'); uiStore.closeAll()"
             class="flex items-center justify-center px-3 py-2 rounded-xl transition-colors text-xs font-bold uppercase tracking-wider"
             :class="navStore.activeView === 'admin' ? 'bg-red-500/20 text-red-400' : 'text-[var(--v-text-secondary)] hover:bg-white/5 hover:text-red-400'"

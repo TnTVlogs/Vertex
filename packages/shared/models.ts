@@ -4,6 +4,7 @@ export interface User {
     email: string;
     avatarUrl?: string;
     status: 'online' | 'offline' | 'idle' | 'dnd';
+    isAdmin?: boolean;
 }
 
 export interface Message {

@@ -14,7 +14,8 @@
     "postinstall": "electron-builder install-app-deps",
     "build:win": "npm run build && electron-builder --win",
     "build:linux": "npm run build && electron-builder --linux",
-    "build:mac": "npm run build && electron-builder --mac"
+    "build:mac": "npm run build && electron-builder --mac",
+    "setup:codecs": "node scripts/setup-ffmpeg.js"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
@@ -50,6 +51,7 @@
   "build": {
     "appId": "com.vertex.app",
     "productName": "Vertex",
+    "afterPack": "./scripts/afterPack.js",
     "directories": {
       "output": "dist"
     },
