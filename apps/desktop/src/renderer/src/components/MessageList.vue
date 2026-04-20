@@ -109,7 +109,7 @@
                 <audio
                   :src="msg.attachmentUrl"
                   controls
-                  class="max-w-[260px] w-full"
+                  style="width: 260px; height: 40px; display: block;"
                 ></audio>
               </div>
 
