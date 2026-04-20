@@ -74,6 +74,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useMessageStore } from '../stores/domain/messageStore'
 import { useI18nStore } from '../stores/i18nStore'
 import { useSocketStore } from '../stores/domain/socketStore'
+import { useToastStore } from '../stores/toastStore'
 import EmojiPicker from './EmojiPicker.vue'
 import { getEmojiUrl } from '../utils/emoji'
 import { v4 as uuidv4 } from 'uuid'
@@ -83,6 +84,7 @@ const authStore = useAuthStore()
 const messageStore = useMessageStore()
 const i18n = useI18nStore()
 const socketStore = useSocketStore()
+const toastStore = useToastStore()
 
 const showEmojiPicker = ref(false)
 const chatInput = ref<HTMLElement | null>(null)
@@ -343,18 +345,36 @@ function triggerFileUpload() {
   fileInput.value?.click()
 }
 
+const ALLOWED_MIME = new Set([
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'application/pdf', 'text/plain',
+  'video/mp4', 'video/webm',
+  'audio/mpeg', 'audio/mp3',
+])
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024 // 10 MB
+
 async function handleFileChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
+  if (fileInput.value) fileInput.value.value = ''
   if (!file) return
+
+  if (!ALLOWED_MIME.has(file.type)) {
+    toastStore.addToast('Format not allowed. Use: images, pdf, txt, mp4, webm, mp3', 'error')
+    return
+  }
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    toastStore.addToast('File exceeds 10 MB limit', 'error')
+    return
+  }
+
   isUploading.value = true
   try {
     const result = await authStore.uploadAttachment(file)
     pendingAttachment.value = result
   } catch (err: any) {
-    console.error('Attachment upload failed:', err.message)
+    toastStore.addToast(err.message || 'Upload failed', 'error')
   } finally {
     isUploading.value = false
-    if (fileInput.value) fileInput.value.value = ''
   }
 }
 

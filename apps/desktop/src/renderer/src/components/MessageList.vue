@@ -104,6 +104,15 @@
                 ></video>
               </div>
 
+              <!-- Attachment: audio -->
+              <div v-else-if="msg.attachmentUrl && attachmentType(msg.attachmentUrl) === 'audio'" class="mt-2">
+                <audio
+                  :src="msg.attachmentUrl"
+                  controls
+                  class="max-w-[260px] w-full"
+                ></audio>
+              </div>
+
               <!-- Attachment: file -->
               <a
                 v-else-if="msg.attachmentUrl"
@@ -201,15 +210,17 @@ watch(lightboxUrl, (val) => {
 
 const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp'])
 const VIDEO_EXTS = new Set(['mp4', 'webm'])
+const AUDIO_EXTS = new Set(['mp3', 'mpeg'])
 
 function attachmentExt(url: string) {
   return url.split('?')[0].split('.').pop()?.toLowerCase() ?? ''
 }
 
-function attachmentType(url: string): 'image' | 'video' | 'file' {
+function attachmentType(url: string): 'image' | 'video' | 'audio' | 'file' {
   const ext = attachmentExt(url)
   if (IMAGE_EXTS.has(ext)) return 'image'
   if (VIDEO_EXTS.has(ext)) return 'video'
+  if (AUDIO_EXTS.has(ext)) return 'audio'
   return 'file'
 }
 

@@ -328,7 +328,25 @@ const onServerAction = async (value: string) => {
         </template>
       </div>
 
-      <div class="p-4 mt-auto border-t border-[var(--v-border)]">
+      <div class="p-4 mt-auto border-t border-[var(--v-border)] space-y-1">
+        <!-- Settings / Admin (mobile only — desktop has the action bar) -->
+        <div class="md:hidden flex space-x-1 mb-1">
+          <button
+            @click="navStore.setActiveView('settings'); uiStore.closeAll()"
+            class="flex-1 flex items-center justify-center px-3 py-2 rounded-xl transition-colors text-xs font-bold uppercase tracking-wider"
+            :class="navStore.activeView === 'settings' ? 'bg-[var(--v-accent)] text-[var(--v-bg-base)]' : 'text-[var(--v-text-secondary)] hover:bg-white/5 hover:text-white'"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="mr-2"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+            Settings
+          </button>
+          <button
+            @click="navStore.setActiveView('admin'); uiStore.closeAll()"
+            class="flex items-center justify-center px-3 py-2 rounded-xl transition-colors text-xs font-bold uppercase tracking-wider"
+            :class="navStore.activeView === 'admin' ? 'bg-red-500/20 text-red-400' : 'text-[var(--v-text-secondary)] hover:bg-white/5 hover:text-red-400'"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+          </button>
+        </div>
         <button @click="handleLogout" class="w-full flex items-center px-3 py-2 text-red-400 hover:bg-red-400/10 rounded-xl transition-colors text-xs font-bold uppercase tracking-wider">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="mr-3"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.59L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
           Logout Session

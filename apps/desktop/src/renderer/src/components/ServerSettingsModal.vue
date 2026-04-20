@@ -134,10 +134,29 @@ async function handleTransferOwnership() {
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-    <div class="bg-[var(--v-bg-base)] border border-[var(--v-border)] w-full max-w-4xl h-[640px] rounded-3xl shadow-2xl flex overflow-hidden">
-      <!-- Sidebar -->
-      <aside class="w-64 bg-[var(--v-bg-sidebar)] border-r border-[var(--v-border)] p-6 flex flex-col">
+  <div v-if="show" class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+    <div class="bg-[var(--v-bg-base)] border border-[var(--v-border)] w-full max-w-4xl max-h-[92vh] sm:max-h-[90vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden">
+
+      <!-- Mobile tabs (horizontal scroll, top) -->
+      <div class="md:hidden flex items-center border-b border-[var(--v-border)] bg-[var(--v-bg-sidebar)] shrink-0">
+        <div class="flex flex-1 overflow-x-auto no-scrollbar">
+          <button
+            v-for="tab in (['overview', 'channels', 'members', 'invites'] as const)"
+            :key="tab"
+            @click="handleTabChange(tab)"
+            class="shrink-0 px-5 py-3.5 text-xs font-black uppercase tracking-wider transition-all border-b-2"
+            :class="activeTab === tab ? 'border-[var(--v-accent)] text-[var(--v-accent)]' : 'border-transparent text-[var(--v-text-secondary)]'"
+          >
+            {{ tab }}
+          </button>
+        </div>
+        <button @click="emit('close')" class="shrink-0 p-3 text-[var(--v-text-secondary)] hover:text-white transition-colors">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+
+      <!-- Desktop sidebar -->
+      <aside class="hidden md:flex w-64 bg-[var(--v-bg-sidebar)] border-r border-[var(--v-border)] p-6 flex-col shrink-0">
         <h2 class="text-xs font-black uppercase tracking-[0.2em] text-[var(--v-text-secondary)] mb-6 opacity-50">Settings</h2>
         <nav class="flex-1 space-y-2">
           <button
@@ -156,7 +175,7 @@ async function handleTransferOwnership() {
       </aside>
 
       <!-- Content -->
-      <main class="flex-1 p-10 overflow-y-auto no-scrollbar relative">
+      <main class="flex-1 p-6 md:p-10 overflow-y-auto no-scrollbar relative">
         <!-- Overview -->
         <section v-if="activeTab === 'overview'" class="space-y-10 animate-in slide-in-from-right-4 duration-500">
           <div>
@@ -186,15 +205,15 @@ async function handleTransferOwnership() {
 
         <!-- Channels -->
         <section v-if="activeTab === 'channels'" class="space-y-8 animate-in slide-in-from-right-4 duration-500">
-          <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-black text-white uppercase italic tracking-tighter">Frequencies</h1>
-            <div class="flex space-x-2">
-               <input v-model="newChannelName" placeholder="New Channel Name" class="bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl px-4 py-2 text-xs outline-none" />
-               <select v-model="newChannelType" class="bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl px-2 py-2 text-xs outline-none">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+            <h1 class="text-2xl font-black text-white uppercase italic tracking-tighter shrink-0">Frequencies</h1>
+            <div class="flex flex-wrap gap-2">
+               <input v-model="newChannelName" placeholder="Channel name" class="flex-1 min-w-0 bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl px-4 py-2 text-xs outline-none" />
+               <select v-model="newChannelType" class="bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl px-2 py-2 text-xs outline-none shrink-0">
                  <option value="text">TEXT</option>
                  <option value="voice">VOICE</option>
                </select>
-               <button @click="handleCreateChannel" class="px-4 py-2 bg-[var(--v-accent)] text-[var(--v-bg-base)] font-black text-[10px] rounded-xl uppercase">Create</button>
+               <button @click="handleCreateChannel" class="px-4 py-2 bg-[var(--v-accent)] text-[var(--v-bg-base)] font-black text-[10px] rounded-xl uppercase shrink-0">Create</button>
             </div>
           </div>
 
@@ -206,7 +225,7 @@ async function handleTransferOwnership() {
                 <span v-else class="text-sm font-black text-white">{{ channel.name }}</span>
                 <span class="text-[8px] font-black uppercase text-[var(--v-text-secondary)] px-1.5 py-0.5 bg-white/5 rounded">{{ channel.type }}</span>
               </div>
-              <div class="flex space-x-2 opacity-0 group-hover:opacity-100 transition-all">
+              <div class="flex space-x-2 md:opacity-0 md:group-hover:opacity-100 transition-all">
                 <button v-if="editingChannelId === channel.id" @click="handleUpdateChannel(channel.id)" class="p-2 text-[var(--v-accent)] hover:scale-110"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></button>
                 <button v-else @click="editingChannelId = channel.id; editingChannelName = channel.name" class="p-2 text-[var(--v-text-secondary)] hover:text-white"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
                 <button @click="handleDeleteChannel(channel.id)" class="p-2 text-red-500 hover:scale-110"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
@@ -230,9 +249,9 @@ async function handleTransferOwnership() {
                  </div>
                </div>
 
-               <div v-if="member.userId !== authStore.user?.id" class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-all">
-                 <button @click="openTransferConfirm(member)" class="px-3 py-1.5 bg-yellow-500/10 text-yellow-500 text-[9px] font-black uppercase rounded-lg border border-yellow-500/20 hover:bg-yellow-500 hover:text-black transition-all">Transfer Ownership</button>
-                 <button @click="handleKick(member.userId)" class="px-3 py-1.5 bg-red-500/10 text-red-500 text-[9px] font-black uppercase rounded-lg border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">Kick Entity</button>
+               <div v-if="member.userId !== authStore.user?.id" class="flex flex-wrap gap-1.5 md:opacity-0 md:group-hover:opacity-100 transition-all">
+                 <button @click="openTransferConfirm(member)" class="px-3 py-1.5 bg-yellow-500/10 text-yellow-500 text-[9px] font-black uppercase rounded-lg border border-yellow-500/20 hover:bg-yellow-500 hover:text-black transition-all">Transfer</button>
+                 <button @click="handleKick(member.userId)" class="px-3 py-1.5 bg-red-500/10 text-red-500 text-[9px] font-black uppercase rounded-lg border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">Kick</button>
                </div>
              </div>
            </div>

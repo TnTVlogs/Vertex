@@ -26,6 +26,7 @@ const ATTACHMENT_MIME = new Set([
     'image/jpeg', 'image/png', 'image/gif', 'image/webp',
     'application/pdf', 'text/plain',
     'video/mp4', 'video/webm',
+    'audio/mpeg', 'audio/mp3',
 ]);
 
 export const avatarUpload = multer({
