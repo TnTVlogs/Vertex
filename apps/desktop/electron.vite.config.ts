@@ -17,6 +17,23 @@ export default defineConfig({
                 '@shared': resolve('../../packages/shared')
             }
         },
-        plugins: [vue()]
+        plugins: [vue()],
+        server: {
+            proxy: {
+                '/api': {
+                    target: 'https://vertex.sergidalmau.dev',
+                    changeOrigin: true,
+                },
+                '/socket.io': {
+                    target: 'https://vertex.sergidalmau.dev',
+                    changeOrigin: true,
+                    ws: true,
+                },
+                '/uploads': {
+                    target: 'https://vertex.sergidalmau.dev',
+                    changeOrigin: true,
+                },
+            }
+        }
     }
 })

@@ -95,12 +95,21 @@
                 />
               </div>
 
-              <!-- Attachment: video -->
+              <!-- Attachment: video (adaptive: hides until metadata loaded, falls back to audio if no video track) -->
               <div v-else-if="msg.attachmentUrl && attachmentType(msg.attachmentUrl) === 'video'" class="mt-2">
-                <video
+                <audio
+                  v-if="isAudioOnly(msg.attachmentUrl)"
                   :src="msg.attachmentUrl"
                   controls
-                  class="rounded-xl max-w-[260px] max-h-48 block"
+                  style="width: 260px; height: 40px; display: block;"
+                ></audio>
+                <video
+                  v-else
+                  :src="msg.attachmentUrl"
+                  controls
+                  class="rounded-xl max-w-[260px] block overflow-hidden transition-[max-height] duration-150"
+                  :class="isVideoChecked(msg.attachmentUrl) ? 'max-h-48' : 'max-h-0'"
+                  @loadedmetadata="onVideoMetadata($event, msg.attachmentUrl!)"
                 ></video>
               </div>
 
@@ -211,6 +220,20 @@ watch(lightboxUrl, (val) => {
 const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp'])
 const VIDEO_EXTS = new Set(['mp4', 'webm'])
 const AUDIO_EXTS = new Set(['mp3', 'mpeg'])
+
+const audioOnlyUrls = ref(new Set<string>())
+const checkedVideoUrls = ref(new Set<string>())
+
+function onVideoMetadata(event: Event, url: string) {
+  const video = event.target as HTMLVideoElement
+  checkedVideoUrls.value = new Set(checkedVideoUrls.value).add(url)
+  if (video.videoWidth === 0) {
+    audioOnlyUrls.value = new Set(audioOnlyUrls.value).add(url)
+  }
+}
+
+function isAudioOnly(url: string) { return audioOnlyUrls.value.has(url) }
+function isVideoChecked(url: string) { return checkedVideoUrls.value.has(url) }
 
 function attachmentExt(url: string) {
   return url.split('?')[0].split('.').pop()?.toLowerCase() ?? ''

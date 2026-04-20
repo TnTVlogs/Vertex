@@ -1,6 +1,11 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+
+// Must be called before app is ready
+if (is.dev) {
+    app.commandLine.appendSwitch('disable-web-security')
+}
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import { registerAuthHandlers } from './ipc/authHandlers'
@@ -176,6 +181,22 @@ app.whenReady().then(() => {
     app.on('browser-window-created', (_, window) => {
         optimizer.watchWindowShortcuts(window)
     })
+
+    // Spoof Origin for prod server requests so Socket.IO WS handshake is accepted.
+    // (disable-web-security handles browser CORS but not server-side WS origin checks)
+    if (isDev) {
+        session.defaultSession.webRequest.onBeforeSendHeaders(
+            { urls: ['https://vertex.sergidalmau.dev/*', 'wss://vertex.sergidalmau.dev/*'] },
+            (details, callback) => {
+                callback({
+                    requestHeaders: {
+                        ...details.requestHeaders,
+                        Origin: 'https://vertex.sergidalmau.dev',
+                    },
+                })
+            }
+        )
+    }
 
     // Registrar Handlers d'Auth
     registerAuthHandlers()
