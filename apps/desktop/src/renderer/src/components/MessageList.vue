@@ -85,9 +85,28 @@
             >
               <div v-html="formatMessage(msg.content || '')"></div>
 
-              <!-- Attachment -->
+              <!-- Attachment: image -->
+              <div v-if="msg.attachmentUrl && attachmentType(msg.attachmentUrl) === 'image'" class="mt-2">
+                <img
+                  :src="msg.attachmentUrl"
+                  @click="lightboxUrl = msg.attachmentUrl"
+                  class="rounded-xl max-w-[260px] max-h-48 object-cover cursor-zoom-in hover:opacity-90 transition-opacity block"
+                  loading="lazy"
+                />
+              </div>
+
+              <!-- Attachment: video -->
+              <div v-else-if="msg.attachmentUrl && attachmentType(msg.attachmentUrl) === 'video'" class="mt-2">
+                <video
+                  :src="msg.attachmentUrl"
+                  controls
+                  class="rounded-xl max-w-[260px] max-h-48 block"
+                ></video>
+              </div>
+
+              <!-- Attachment: file -->
               <a
-                v-if="msg.attachmentUrl"
+                v-else-if="msg.attachmentUrl"
                 :href="msg.attachmentUrl"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -112,11 +131,48 @@
         </div>
       </template>
     </VList>
+
+    <!-- Image lightbox -->
+    <Teleport to="body">
+      <div
+        v-if="lightboxUrl"
+        ref="lightboxEl"
+        tabindex="-1"
+        @click.self="lightboxUrl = null"
+        @keyup.esc="lightboxUrl = null"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm outline-none"
+      >
+        <div class="relative max-w-[80vw] max-h-[80vh] flex items-center justify-center">
+          <img
+            :src="lightboxUrl"
+            class="max-w-[80vw] max-h-[80vh] rounded-2xl shadow-2xl object-contain"
+          />
+          <div class="absolute top-3 right-3 flex space-x-2">
+            <a
+              :href="lightboxUrl"
+              :download="true"
+              @click.stop
+              class="p-2 rounded-xl bg-black/60 hover:bg-black/90 text-white transition-colors"
+              title="Download"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            </a>
+            <button
+              @click="lightboxUrl = null"
+              class="p-2 rounded-xl bg-black/60 hover:bg-black/90 text-white transition-colors"
+              title="Close"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, computed } from 'vue'
+import { ref, nextTick, computed, watch } from 'vue'
 import { VList } from 'virtua/vue'
 import UserAvatar from './UserAvatar.vue'
 import { useChatStore } from '../stores/chatStore'
@@ -136,9 +192,29 @@ const messageStore = useMessageStore()
 
 const vListRef = ref<InstanceType<typeof VList> | null>(null)
 const sortedMessages = computed((): Message[] => chatStore.sortedMessages)
+const lightboxUrl = ref<string | null>(null)
+const lightboxEl = ref<HTMLElement | null>(null)
+
+watch(lightboxUrl, (val) => {
+  if (val) nextTick(() => lightboxEl.value?.focus())
+})
+
+const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp'])
+const VIDEO_EXTS = new Set(['mp4', 'webm'])
+
+function attachmentExt(url: string) {
+  return url.split('?')[0].split('.').pop()?.toLowerCase() ?? ''
+}
+
+function attachmentType(url: string): 'image' | 'video' | 'file' {
+  const ext = attachmentExt(url)
+  if (IMAGE_EXTS.has(ext)) return 'image'
+  if (VIDEO_EXTS.has(ext)) return 'video'
+  return 'file'
+}
 
 function attachmentName(url: string): string {
-  const ext = url.split('.').pop()?.toLowerCase() ?? ''
+  const ext = attachmentExt(url)
   const typeMap: Record<string, string> = {
     pdf: 'PDF Document', txt: 'Text File',
     mp4: 'Video', webm: 'Video',
