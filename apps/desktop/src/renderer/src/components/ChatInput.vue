@@ -21,7 +21,7 @@
         <button
           @click="triggerFileUpload"
           :disabled="isUploading"
-          class="w-10 h-10 flex items-center justify-center transition-colors"
+          class="w-10 h-10 flex items-center justify-center transition-colors shrink-0"
           :class="isUploading ? 'text-[var(--v-accent)]' : 'text-[var(--v-text-secondary)] hover:text-[var(--v-text-primary)]'"
           title="Attach file"
         >
@@ -29,16 +29,19 @@
           <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
         </button>
         <input ref="fileInput" type="file" class="hidden" @change="handleFileChange" />
-        <textarea
+
+        <div
           ref="chatInput"
-          v-model="messageText"
+          contenteditable="true"
+          :data-placeholder="i18n.t('chat.placeholder')"
+          @input="handleContentInput"
           @keydown.enter.exact.prevent="handleSend"
-          @input="autoResize(); handleTyping(); expandShortcodes()"
-          rows="1"
-          :placeholder="i18n.t('chat.placeholder')"
-          class="flex-1 bg-transparent border-none outline-none resize-none px-4 py-2 text-sm font-medium text-[var(--v-text-primary)] tracking-wide overflow-y-auto max-h-32 min-h-[1.5em] select-text placeholder:text-[var(--v-text-secondary)] placeholder:opacity-50"
-        ></textarea>
-        <div class="flex items-center pr-2 space-x-1">
+          @copy.prevent="handleCopy"
+          @paste.prevent="handlePaste"
+          class="chat-input flex-1 px-4 py-2 text-sm font-medium text-[var(--v-text-primary)] tracking-wide overflow-y-auto max-h-32 min-h-[1.5em] outline-none select-text"
+        ></div>
+
+        <div class="flex items-center pr-2 space-x-1 shrink-0">
           <span
             v-if="charCount > 0"
             class="text-[10px] font-mono font-bold mr-1 transition-colors"
@@ -65,14 +68,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import { useMessageStore } from '../stores/domain/messageStore'
 import { useI18nStore } from '../stores/i18nStore'
 import { useSocketStore } from '../stores/domain/socketStore'
 import EmojiPicker from './EmojiPicker.vue'
-import { SHORTCODE_TO_UNICODE } from '../utils/shortcodes'
+import { getEmojiUrl } from '../utils/emoji'
 import { v4 as uuidv4 } from 'uuid'
 
 const chatStore = useChatStore()
@@ -82,7 +85,7 @@ const i18n = useI18nStore()
 const socketStore = useSocketStore()
 
 const showEmojiPicker = ref(false)
-const chatInput = ref<HTMLTextAreaElement | null>(null)
+const chatInput = ref<HTMLElement | null>(null)
 const inputContainer = ref<HTMLElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const messageText = ref('')
@@ -92,44 +95,174 @@ const pendingAttachment = ref<{ url: string; filename: string; mimetype: string 
 let typingTimeout: ReturnType<typeof setTimeout> | null = null
 let isTyping = false
 
-function triggerFileUpload() {
-  fileInput.value?.click()
+// ── Emoji img helpers ──────────────────────────────────────────────────────
+
+function createEmojiImg(shortcode: string): HTMLImageElement | null {
+  const url = getEmojiUrl(shortcode)
+  if (!url) return null
+  const img = document.createElement('img')
+  img.src = url
+  img.alt = shortcode
+  img.className = 'twemoji-input'
+  img.setAttribute('draggable', 'false')
+  return img
 }
 
-async function handleFileChange(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  isUploading.value = true
-  try {
-    const result = await authStore.uploadAttachment(file)
-    pendingAttachment.value = result
-  } catch (err: any) {
-    console.error('Attachment upload failed:', err.message)
-  } finally {
-    isUploading.value = false
-    if (fileInput.value) fileInput.value.value = ''
+// ── Text extraction (innerHTML → shortcodes) ───────────────────────────────
+
+function extractText(el: Node): string {
+  let text = ''
+  for (const node of el.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      text += node.textContent ?? ''
+    } else if ((node as Element).tagName === 'IMG') {
+      text += (node as HTMLImageElement).alt ?? ''
+    } else if ((node as Element).tagName === 'BR') {
+      text += '\n'
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const tag = (node as Element).tagName
+      if (tag === 'DIV' || tag === 'P') text += '\n'
+      text += extractText(node)
+    }
   }
+  return text
 }
 
-function expandShortcodes() {
+function updateMessageText() {
   const el = chatInput.value
-  if (!el) return
-  const text = el.value  // read directly from DOM, always current
-  const cursor = el.selectionStart ?? text.length
+  messageText.value = el ? extractText(el) : ''
+}
+
+// ── Shortcode expansion ────────────────────────────────────────────────────
+
+function expandShortcodeAtCursor() {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0) return
+  const range = sel.getRangeAt(0)
+  if (!range.collapsed) return
+
+  const node = range.startContainer
+  if (node.nodeType !== Node.TEXT_NODE) return
+
+  const text = node.textContent ?? ''
+  const cursor = range.startOffset
   const before = text.slice(0, cursor)
   const match = before.match(/:([a-z0-9_]+):$/)
   if (!match) return
+
   const shortcode = match[0]
-  const unicode = SHORTCODE_TO_UNICODE[shortcode]
-  if (!unicode) return
+  const img = createEmojiImg(shortcode)
+  if (!img) return
+
   const start = cursor - shortcode.length
-  const newText = text.slice(0, start) + unicode + text.slice(cursor)
-  messageText.value = newText
-  nextTick(() => {
-    const newPos = start + unicode.length
-    el.setSelectionRange(newPos, newPos)
-  })
+  const textNode = node as Text
+  const parent = textNode.parentNode!
+
+  const beforeNode = document.createTextNode(text.slice(0, start))
+  const afterNode = document.createTextNode(text.slice(cursor))
+  parent.insertBefore(beforeNode, textNode)
+  parent.insertBefore(img, textNode)
+  parent.insertBefore(afterNode, textNode)
+  parent.removeChild(textNode)
+
+  const newRange = document.createRange()
+  newRange.setStartAfter(img)
+  newRange.collapse(true)
+  sel.removeAllRanges()
+  sel.addRange(newRange)
 }
+
+function expandAllShortcodes(el: HTMLElement) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  const textNodes: Text[] = []
+  let n: Text | null
+  while ((n = walker.nextNode() as Text | null)) textNodes.push(n)
+
+  for (const textNode of textNodes) {
+    const text = textNode.textContent ?? ''
+    if (!/:([a-z0-9_]+):/.test(text)) continue
+
+    const parts = text.split(/(:[a-z0-9_]+:)/g)
+    if (parts.length <= 1) continue
+
+    const frag = document.createDocumentFragment()
+    for (const part of parts) {
+      const img = /^:[a-z0-9_]+:$/.test(part) ? createEmojiImg(part) : null
+      frag.appendChild(img ?? document.createTextNode(part))
+    }
+    textNode.parentNode?.replaceChild(frag, textNode)
+  }
+}
+
+// ── Input handler ──────────────────────────────────────────────────────────
+
+function handleContentInput() {
+  expandShortcodeAtCursor()
+  updateMessageText()
+  handleTyping()
+}
+
+// ── Copy: serialize selection as shortcode text ───────────────────────────
+
+function handleCopy(e: ClipboardEvent) {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0 || !e.clipboardData) return
+  const frag = sel.getRangeAt(0).cloneContents()
+  const tmp = document.createElement('div')
+  tmp.appendChild(frag)
+  e.clipboardData.setData('text/plain', extractText(tmp))
+}
+
+// ── Paste: insert plain text, expand shortcodes ───────────────────────────
+
+function handlePaste(e: ClipboardEvent) {
+  const text = e.clipboardData?.getData('text/plain') ?? ''
+  if (!text) return
+
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0) return
+  const range = sel.getRangeAt(0)
+  range.deleteContents()
+  const textNode = document.createTextNode(text)
+  range.insertNode(textNode)
+  range.setStartAfter(textNode)
+  range.collapse(true)
+  sel.removeAllRanges()
+  sel.addRange(range)
+
+  const el = chatInput.value
+  if (el) expandAllShortcodes(el)
+  updateMessageText()
+}
+
+// ── Emoji picker insert ────────────────────────────────────────────────────
+
+function addEmoji(shortcode: string) {
+  const el = chatInput.value
+  if (!el) return
+  el.focus()
+
+  const img = createEmojiImg(shortcode)
+  if (!img) return
+
+  const sel = window.getSelection()
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0)
+    range.deleteContents()
+    range.insertNode(img)
+    range.setStartAfter(img)
+    range.collapse(true)
+    sel.removeAllRanges()
+    sel.addRange(range)
+  } else {
+    el.appendChild(img)
+  }
+
+  updateMessageText()
+  showEmojiPicker.value = true
+}
+
+// ── Tier / char count ─────────────────────────────────────────────────────
 
 const TIER_LIMITS: Record<string, number> = { BASIC: 200, PRO: 400, VIP: 500 }
 const tierLimit = computed(() => {
@@ -139,12 +272,7 @@ const tierLimit = computed(() => {
 const charCount = computed(() => messageText.value.length)
 const isOverLimit = computed(() => charCount.value > tierLimit.value)
 
-function autoResize() {
-  const el = chatInput.value
-  if (!el) return
-  el.style.height = 'auto'
-  el.style.height = Math.min(el.scrollHeight, 128) + 'px'
-}
+// ── Typing indicator ──────────────────────────────────────────────────────
 
 function handleTyping() {
   if (!isTyping) {
@@ -158,9 +286,12 @@ function handleTyping() {
   }, 2000)
 }
 
+// ── Send ──────────────────────────────────────────────────────────────────
+
 async function handleSend() {
   if (isOverLimit.value || isSending.value) return
-  const text = messageText.value.trim()
+  const el = chatInput.value
+  const text = (el ? extractText(el) : messageText.value).trim()
   const attachment = pendingAttachment.value
   if ((!text && !attachment) || !authStore.user) return
 
@@ -187,10 +318,10 @@ async function handleSend() {
     attachmentUrl: attachment?.url,
   })
 
+  if (el) el.innerHTML = ''
   messageText.value = ''
   pendingAttachment.value = null
   showEmojiPicker.value = false
-  nextTick(autoResize)
 
   try {
     const response = await chatStore.sendMessage(text, attachment?.url)
@@ -205,21 +336,29 @@ async function handleSend() {
     isSending.value = false
   }
 }
-function addEmoji(shortcode: string) {
-  const el = chatInput.value
-  if (!el) return
-  const unicode = SHORTCODE_TO_UNICODE[shortcode] ?? shortcode
-  const start = el.selectionStart ?? messageText.value.length
-  const end = el.selectionEnd ?? messageText.value.length
-  messageText.value = messageText.value.slice(0, start) + unicode + messageText.value.slice(end)
-  nextTick(() => {
-    const newPos = start + unicode.length
-    el.setSelectionRange(newPos, newPos)
-    el.focus()
-    autoResize()
-  })
-  showEmojiPicker.value = true
+
+// ── File upload ───────────────────────────────────────────────────────────
+
+function triggerFileUpload() {
+  fileInput.value?.click()
 }
+
+async function handleFileChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  isUploading.value = true
+  try {
+    const result = await authStore.uploadAttachment(file)
+    pendingAttachment.value = result
+  } catch (err: any) {
+    console.error('Attachment upload failed:', err.message)
+  } finally {
+    isUploading.value = false
+    if (fileInput.value) fileInput.value.value = ''
+  }
+}
+
+// ── Click outside ─────────────────────────────────────────────────────────
 
 function handleClickOutside(e: MouseEvent) {
   if (showEmojiPicker.value && inputContainer.value && !inputContainer.value.contains(e.target as Node)) {
@@ -235,3 +374,19 @@ onUnmounted(() => {
   document.removeEventListener('mousedown', handleClickOutside)
 })
 </script>
+
+<style scoped>
+.chat-input:empty::before {
+  content: attr(data-placeholder);
+  color: var(--v-text-secondary);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+:deep(.twemoji-input) {
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.2em;
+  display: inline;
+}
+</style>
