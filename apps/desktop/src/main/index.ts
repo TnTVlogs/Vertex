@@ -182,21 +182,30 @@ app.whenReady().then(() => {
         optimizer.watchWindowShortcuts(window)
     })
 
-    // Spoof Origin for prod server requests so Socket.IO WS handshake is accepted.
-    // (disable-web-security handles browser CORS but not server-side WS origin checks)
-    if (isDev) {
-        session.defaultSession.webRequest.onBeforeSendHeaders(
-            { urls: ['https://vertex.sergidalmau.dev/*', 'wss://vertex.sergidalmau.dev/*'] },
-            (details, callback) => {
-                callback({
-                    requestHeaders: {
-                        ...details.requestHeaders,
-                        Origin: 'https://vertex.sergidalmau.dev',
-                    },
-                })
-            }
-        )
-    }
+    // Spoof Origin so server-side CORS/WS origin checks accept requests from file:// (packaged)
+    // and localhost (dev). Server checks Origin header — Electron sends file:// which fails.
+    session.defaultSession.webRequest.onBeforeSendHeaders(
+        { urls: ['https://vertex.sergidalmau.dev/*', 'wss://vertex.sergidalmau.dev/*'] },
+        (details, callback) => {
+            callback({
+                requestHeaders: {
+                    ...details.requestHeaders,
+                    Origin: 'https://vertex.sergidalmau.dev',
+                },
+            })
+        }
+    )
+
+    // Override CORP header on uploads so Electron (file://) can load cross-origin media/images.
+    // Server sends CORP: same-origin (helmet default) which Chromium blocks from file://.
+    session.defaultSession.webRequest.onHeadersReceived(
+        { urls: ['https://vertex.sergidalmau.dev/uploads/*'] },
+        (details, callback) => {
+            const headers = { ...details.responseHeaders }
+            headers['cross-origin-resource-policy'] = ['cross-origin']
+            callback({ responseHeaders: headers })
+        }
+    )
 
     // Registrar Handlers d'Auth
     registerAuthHandlers()
