@@ -24,18 +24,10 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
     .map(o => o.trim())
     .filter(Boolean);
 
-const isDev = process.env.NODE_ENV !== 'production';
-
-const isAllowedOrigin = (origin: string) => {
-    if (allowedOrigins.includes(origin)) return true;
-    if (isDev && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
-    return false;
-};
-
 const corsOptions: cors.CorsOptions = {
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
-        if (isAllowedOrigin(origin)) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
         callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -48,7 +40,7 @@ const io = new Server(httpServer, {
     cors: {
         origin: (origin, callback) => {
             if (!origin) return callback(null, true);
-            if (isAllowedOrigin(origin)) return callback(null, true);
+            if (allowedOrigins.includes(origin)) return callback(null, true);
             callback(new Error(`Origin ${origin} not allowed by CORS`));
         },
         methods: ['GET', 'POST']
