@@ -95,31 +95,14 @@
                 />
               </div>
 
-              <!-- Attachment: video (adaptive: hides until metadata loaded, falls back to audio if no video track) -->
+              <!-- Attachment: video (custom player, auto-detects audio-only MP4) -->
               <div v-else-if="msg.attachmentUrl && attachmentType(msg.attachmentUrl) === 'video'" class="mt-2">
-                <audio
-                  v-if="isAudioOnly(msg.attachmentUrl)"
-                  :src="msg.attachmentUrl"
-                  controls
-                  style="width: 260px; height: 40px; display: block;"
-                ></audio>
-                <video
-                  v-else
-                  :src="msg.attachmentUrl"
-                  controls
-                  class="rounded-xl max-w-[260px] block overflow-hidden transition-[max-height] duration-150"
-                  :class="isVideoChecked(msg.attachmentUrl) ? 'max-h-48' : 'max-h-0'"
-                  @loadedmetadata="onVideoMetadata($event, msg.attachmentUrl!)"
-                ></video>
+                <VideoPlayer :src="msg.attachmentUrl" />
               </div>
 
               <!-- Attachment: audio -->
               <div v-else-if="msg.attachmentUrl && attachmentType(msg.attachmentUrl) === 'audio'" class="mt-2">
-                <audio
-                  :src="msg.attachmentUrl"
-                  controls
-                  style="width: 260px; height: 40px; display: block;"
-                ></audio>
+                <AudioPlayer :src="msg.attachmentUrl" />
               </div>
 
               <!-- Attachment: file -->
@@ -193,6 +176,8 @@
 import { ref, nextTick, computed, watch } from 'vue'
 import { VList } from 'virtua/vue'
 import UserAvatar from './UserAvatar.vue'
+import AudioPlayer from './AudioPlayer.vue'
+import VideoPlayer from './VideoPlayer.vue'
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -220,20 +205,6 @@ watch(lightboxUrl, (val) => {
 const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp'])
 const VIDEO_EXTS = new Set(['mp4', 'webm'])
 const AUDIO_EXTS = new Set(['mp3', 'mpeg'])
-
-const audioOnlyUrls = ref(new Set<string>())
-const checkedVideoUrls = ref(new Set<string>())
-
-function onVideoMetadata(event: Event, url: string) {
-  const video = event.target as HTMLVideoElement
-  checkedVideoUrls.value = new Set(checkedVideoUrls.value).add(url)
-  if (video.videoWidth === 0) {
-    audioOnlyUrls.value = new Set(audioOnlyUrls.value).add(url)
-  }
-}
-
-function isAudioOnly(url: string) { return audioOnlyUrls.value.has(url) }
-function isVideoChecked(url: string) { return checkedVideoUrls.value.has(url) }
 
 function attachmentExt(url: string) {
   return url.split('?')[0].split('.').pop()?.toLowerCase() ?? ''
