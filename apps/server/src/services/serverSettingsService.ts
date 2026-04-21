@@ -1,5 +1,6 @@
 import prisma from './prisma';
 import { ChannelType } from '@prisma/client';
+import { invalidateMembersCache, invalidateServersCache } from './serverService';
 
 export const serverSettingsService = {
     async createChannel(serverId: string, name: string, type: ChannelType = ChannelType.text) {
@@ -51,18 +52,15 @@ export const serverSettingsService = {
     },
 
     async kickMember(serverId: string, userId: string) {
-        return prisma.member.delete({
-            where: {
-                serverId_userId: {
-                    serverId,
-                    userId
-                }
-            }
+        const result = await prisma.member.delete({
+            where: { serverId_userId: { serverId, userId } }
         });
+        invalidateMembersCache(serverId);
+        invalidateServersCache(userId);
+        return result;
     },
 
     async transferOwnership(serverId: string, newOwnerId: string) {
-        // We use a transaction to swap ownerId and roles atomically
         return prisma.$transaction(async (tx) => {
             const server = await tx.server.findUnique({
                 where: { id: serverId },
@@ -101,6 +99,9 @@ export const serverSettingsService = {
             });
 
             return { message: 'Success' };
+        }).then((result) => {
+            invalidateMembersCache(serverId);
+            return result;
         });
     },
 
@@ -113,34 +114,39 @@ export const serverSettingsService = {
     },
 
     async muteMember(serverId: string, userId: string, mutedUntil?: Date | null) {
-        return prisma.member.update({
+        const result = await prisma.member.update({
             where: { serverId_userId: { serverId, userId } },
-            data: {
-                isMuted: true,
-                mutedUntil: mutedUntil ?? null,
-            },
+            data: { isMuted: true, mutedUntil: mutedUntil ?? null },
         });
+        invalidateMembersCache(serverId);
+        return result;
     },
 
     async unmuteMember(serverId: string, userId: string) {
-        return prisma.member.update({
+        const result = await prisma.member.update({
             where: { serverId_userId: { serverId, userId } },
             data: { isMuted: false, mutedUntil: null },
         });
+        invalidateMembersCache(serverId);
+        return result;
     },
 
     async banMember(serverId: string, userId: string) {
-        return prisma.member.update({
+        const result = await prisma.member.update({
             where: { serverId_userId: { serverId, userId } },
             data: { isBanned: true },
         });
+        invalidateMembersCache(serverId);
+        return result;
     },
 
     async unbanMember(serverId: string, userId: string) {
-        return prisma.member.update({
+        const result = await prisma.member.update({
             where: { serverId_userId: { serverId, userId } },
             data: { isBanned: false },
         });
+        invalidateMembersCache(serverId);
+        return result;
     },
 
     async getMemberStatus(serverId: string, userId: string) {

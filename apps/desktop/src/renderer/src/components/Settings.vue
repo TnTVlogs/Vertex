@@ -1,8 +1,8 @@
 <template>
-  <div class="flex-1 flex flex-col md:flex-row overflow-hidden bg-[var(--v-bg-base)] animate-in fade-in duration-500">
+  <div class="flex-1 flex flex-col min-[1100px]:flex-row overflow-hidden bg-[var(--v-bg-base)] animate-in fade-in duration-500">
 
     <!-- Mobile tabs (horizontal scroll) -->
-    <div class="md:hidden flex overflow-x-auto no-scrollbar border-b border-[var(--v-border)] shrink-0">
+    <div class="min-[1100px]:hidden flex overflow-x-auto no-scrollbar border-b border-[var(--v-border)] shrink-0">
       <button
         v-for="cat in categories"
         :key="cat.id"
@@ -16,7 +16,7 @@
     </div>
 
     <!-- Desktop sidebar -->
-    <div class="hidden md:flex w-64 border-r border-[var(--v-border)] flex-col p-6 space-y-2 shrink-0">
+    <div class="hidden min-[1100px]:flex w-64 border-r border-[var(--v-border)] flex-col p-6 space-y-2 shrink-0">
       <h2 class="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--v-text-secondary)] mb-6 px-3">
         {{ i18n.t('settings.title') }}
       </h2>
@@ -35,7 +35,7 @@
     </div>
 
     <!-- Category Content -->
-    <div class="flex-1 overflow-y-auto no-scrollbar p-6 md:p-10">
+    <div class="flex-1 overflow-y-auto no-scrollbar p-6 min-[1100px]:p-10">
       <div class="max-w-2xl mx-auto space-y-12">
         
         <!-- ACCOUNT CATEGORY -->

@@ -3,7 +3,16 @@ import redisClient from './redisService';
 import { Tier } from '../config/limits.config';
 import { getLimits } from './tierService';
 
-const PREVIEW_CACHE_TTL = 300; // 5 minutes
+const PREVIEW_CACHE_TTL = 300;
+const MEMBERS_CACHE_TTL = 120;  // 2 min
+const SERVERS_CACHE_TTL = 120;  // 2 min
+
+export function invalidateMembersCache(serverId: string) {
+    if (redisClient.isOpen) redisClient.del(`members:${serverId}`).catch(() => {});
+}
+export function invalidateServersCache(userId: string) {
+    if (redisClient.isOpen) redisClient.del(`servers:${userId}`).catch(() => {});
+}
 
 export const serverService = {
     async createServer(name: string, ownerId: string) {
@@ -48,37 +57,44 @@ export const serverService = {
                 name: server.name,
                 generalChannelId: server.channels[0].id
             };
+        }).then((result) => {
+            invalidateServersCache(ownerId);
+            return result;
         });
     },
 
     async getServersForUser(userId: string) {
-        // Only fetch servers + channels. Members are fetched on demand via getMembersForServer.
-        return prisma.server.findMany({
-            where: {
-                members: {
-                    some: { userId }
-                }
-            },
-            include: {
-                channels: true,
-            }
+        const key = `servers:${userId}`;
+        if (redisClient.isOpen) {
+            const cached = await redisClient.get(key);
+            if (cached) return JSON.parse(cached);
+        }
+        const servers = await prisma.server.findMany({
+            where: { members: { some: { userId } } },
+            include: { channels: true },
         });
+        if (redisClient.isOpen) {
+            await redisClient.setEx(key, SERVERS_CACHE_TTL, JSON.stringify(servers));
+        }
+        return servers;
     },
 
     async getMembersForServer(serverId: string) {
-        return prisma.member.findMany({
+        const key = `members:${serverId}`;
+        if (redisClient.isOpen) {
+            const cached = await redisClient.get(key);
+            if (cached) return JSON.parse(cached);
+        }
+        const members = await prisma.member.findMany({
             where: { serverId },
             include: {
-                user: {
-                    select: {
-                        id: true,
-                        username: true,
-                        avatarUrl: true,
-                        status: true,
-                    }
-                }
-            }
+                user: { select: { id: true, username: true, avatarUrl: true, status: true } },
+            },
         });
+        if (redisClient.isOpen) {
+            await redisClient.setEx(key, MEMBERS_CACHE_TTL, JSON.stringify(members));
+        }
+        return members;
     },
 
     async getChannelsForServer(serverId: string) {
@@ -134,6 +150,10 @@ export const serverService = {
                     role: 'member'
                 }
             });
+        }).then((result) => {
+            invalidateMembersCache(result.serverId);
+            invalidateServersCache(userId);
+            return result;
         });
     },
 

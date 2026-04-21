@@ -1,5 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
 import prisma from './prisma';
+import redisClient from './redisService';
+
+const FRIENDS_CACHE_TTL = 60;
+
+function invalidateFriendsCache(userId: string) {
+    if (redisClient.isOpen) redisClient.del(`friends:${userId}`).catch(() => {});
+}
 
 export const socialService = {
     async getUserIdByUsername(username: string): Promise<string | null> {
@@ -83,15 +90,22 @@ export const socialService = {
 
     async createFriendship(userId1: string, userId2: string): Promise<void> {
         const [u1, u2] = [userId1, userId2].sort();
-        // upsert to gracefully handle the rare duplicate (mirrors the old INSERT IGNORE)
         await prisma.friendship.upsert({
             where: { user1Id_user2Id: { user1Id: u1, user2Id: u2 } },
             create: { id: uuidv4(), user1Id: u1, user2Id: u2 },
             update: {},
         });
+        invalidateFriendsCache(userId1);
+        invalidateFriendsCache(userId2);
     },
 
     async getFriends(userId: string, limit = 50, cursor?: string) {
+        const cacheKey = `friends:${userId}`;
+        if (!cursor && redisClient.isOpen) {
+            const cached = await redisClient.get(cacheKey);
+            if (cached) return JSON.parse(cached);
+        }
+
         const friendships = await prisma.friendship.findMany({
             where: { OR: [{ user1Id: userId }, { user2Id: userId }] },
             include: {
@@ -108,6 +122,12 @@ export const socialService = {
         type FriendshipWithUsers = (typeof page)[number];
         const friends = page.map((f: FriendshipWithUsers) => (f.user1Id === userId ? f.user2 : f.user1));
         const nextCursor = hasMore ? page[page.length - 1].id : null;
-        return { friends, nextCursor };
+        const result = { friends, nextCursor };
+
+        if (!cursor && redisClient.isOpen) {
+            await redisClient.setEx(cacheKey, FRIENDS_CACHE_TTL, JSON.stringify(result));
+        }
+
+        return result;
     },
 };
