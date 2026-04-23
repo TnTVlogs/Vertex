@@ -23,43 +23,13 @@
       @click="toggle" />
 
     <!-- Spinner overlay while waiting for metadata -->
-    <div v-if="!audioOnly && !videoReady"
-      class="absolute inset-0 flex items-center justify-center">
+    <div v-if="!videoReady"
+      class="absolute inset-0 flex items-center justify-center" style="height:54px">
       <div class="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
     </div>
 
-    <!-- Audio-only layout (MP4 without video track) -->
-    <div v-if="audioOnly" class="flex items-center gap-2 px-3 py-2.5">
-      <button @click="toggle"
-        class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-white/20 hover:bg-white/35 active:scale-95 transition-all text-white">
-        <svg v-if="!playing" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        <svg v-else viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-      </button>
-      <div class="flex-1 flex flex-col gap-1 min-w-0">
-        <input type="range" class="seek w-full"
-          :max="duration || 100" :value="currentTime" step="0.1" @input="seek" />
-        <div class="flex justify-between text-[9px] font-mono text-white/55">
-          <span>{{ fmt(currentTime) }}</span>
-          <span>{{ fmt(duration) }}</span>
-        </div>
-      </div>
-      <button @click="toggleMute" class="text-white/55 hover:text-white transition-colors shrink-0">
-        <svg v-if="!muted" viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
-        </svg>
-        <svg v-else viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-          <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
-        </svg>
-      </button>
-      <input type="range" class="vol" min="0" max="1" step="0.05"
-        :value="volume" @input="onVol" style="width: 44px" />
-      <a :href="src" download class="w-6 h-6 flex items-center justify-center text-white/55 hover:text-white transition-colors shrink-0">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-      </a>
-    </div>
-
     <!-- Big play button (video paused) -->
-    <div v-if="!audioOnly && videoReady && !playing"
+    <div v-if="videoReady && !playing"
       class="absolute inset-0 flex items-center justify-center pointer-events-none">
       <div :class="isFullscreen ? 'w-20 h-20' : 'w-12 h-12'"
         class="rounded-full bg-black/55 flex items-center justify-center transition-all">
@@ -70,7 +40,7 @@
     </div>
 
     <!-- Controls overlay (video mode) -->
-    <div v-if="!audioOnly && videoReady"
+    <div v-if="videoReady"
       class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-200"
       :class="[showCtrl || !playing ? 'opacity-100' : 'opacity-0']"
       :style="isFullscreen ? 'padding:1.5rem 1.5rem 1.25rem;height:72px;box-sizing:border-box;' : 'padding:2rem 0.625rem 0.5rem;'">
@@ -135,7 +105,6 @@ const playing = ref(false)
 const muted = ref(false)
 const volume = ref(1)
 const prevVolume = ref(1)
-const audioOnly = ref(false)
 const videoReady = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
@@ -145,18 +114,8 @@ const isFullscreen = ref(false)
 let hideTimer: ReturnType<typeof setTimeout> | null = null
 let metaTimer: ReturnType<typeof setTimeout> | null = null
 
-// Video element style: always rendered (no display:none) so Chromium loads metadata.
-// - Before metadata: tiny visible black square (spinner overlay covers it)
-// - audioOnly detected: zero size, out of flow
-// - videoReady: full size
 const videoStyle = computed(() => {
-  if (audioOnly.value) {
-    return 'width:0;height:0;position:absolute;overflow:hidden;'
-  }
   if (isFullscreen.value && videoReady.value) {
-    // Browser already makes wrapper fill 100vw×100vh when fullscreen.
-    // Video fills wrapper entirely; object-fit:contain letterboxes/pillarboxes.
-    // Controls are absolute overlay on top — no need to subtract their height.
     return 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;'
   }
   if (!videoReady.value) {
@@ -176,15 +135,10 @@ function startHide() {
 }
 
 function applyMeta() {
-  const v = el.value
-  if (!v || audioOnly.value || videoReady.value) return
+  if (videoReady.value) return
   if (metaTimer) { clearTimeout(metaTimer); metaTimer = null }
-  duration.value = v.duration || 0
-  if (v.videoWidth === 0 || v.videoHeight === 0) {
-    audioOnly.value = true
-  } else {
-    videoReady.value = true
-  }
+  duration.value = el.value?.duration || 0
+  videoReady.value = true
 }
 
 function onMeta() { applyMeta() }
@@ -247,7 +201,7 @@ onMounted(() => {
   el.value?.load()
   // Timeout fallback: if loadedmetadata+canplay never fire, treat as audio-only
   metaTimer = setTimeout(() => {
-    if (!audioOnly.value && !videoReady.value) audioOnly.value = true
+    if (!videoReady.value) videoReady.value = true
   }, 4000)
 })
 onUnmounted(() => {

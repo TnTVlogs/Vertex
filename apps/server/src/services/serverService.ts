@@ -85,12 +85,20 @@ export const serverService = {
             const cached = await redisClient.get(key);
             if (cached) return JSON.parse(cached);
         }
-        const members = await prisma.member.findMany({
+        const raw = await prisma.member.findMany({
             where: { serverId },
             include: {
                 user: { select: { id: true, username: true, avatarUrl: true, status: true } },
             },
         });
+        const members = raw.map((m) => ({
+            id: m.id,
+            userId: m.userId,
+            serverId: m.serverId,
+            role: m.role,
+            username: m.user?.username ?? '',
+            avatarUrl: m.user?.avatarUrl ?? null,
+        }));
         if (redisClient.isOpen) {
             await redisClient.setEx(key, MEMBERS_CACHE_TTL, JSON.stringify(members));
         }

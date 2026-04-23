@@ -38,6 +38,7 @@ export interface ServerMember {
     userId: string;
     serverId: string;
     username: string;
+    avatarUrl: string | null;
     role: 'ADMIN' | 'MEMBER';
 }
 

@@ -241,7 +241,7 @@ async function handleTransferOwnership() {
              <div v-for="member in serverStore.members" :key="member.id" class="flex items-center justify-between p-4 bg-[var(--v-bg-surface)]/50 rounded-2xl border border-[var(--v-border)] group">
                <div class="flex items-center space-x-4">
                  <div class="w-10 h-10 rounded-xl bg-[var(--v-bg-surface)] border border-[var(--v-border)] flex items-center justify-center font-black">
-                   {{ member.username.charAt(0).toUpperCase() }}
+                   {{ member.username?.charAt(0).toUpperCase() ?? '?' }}
                  </div>
                  <div class="flex flex-col">
                    <span class="text-sm font-black text-white">{{ member.username }}</span>
