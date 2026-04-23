@@ -1,8 +1,7 @@
 <template>
   <div ref="wrapper"
-    class="relative bg-black select-none"
-    :class="isFullscreen ? '' : 'rounded-xl overflow-hidden'"
-    :style="isFullscreen ? 'width:100vw;height:100vh;' : 'width:260px'"
+    class="relative rounded-xl overflow-hidden bg-black select-none"
+    style="width:260px"
     @mouseenter="revealCtrl"
     @mouseleave="startHide"
     @mousemove="revealCtrl">
@@ -155,8 +154,10 @@ const videoStyle = computed(() => {
     return 'width:0;height:0;position:absolute;overflow:hidden;'
   }
   if (isFullscreen.value && videoReady.value) {
-    // Fill wrapper (100vw x 100vh), leave room for controls bar (~72px)
-    return 'position:absolute;top:0;left:0;width:100%;height:calc(100vh - 72px);object-fit:contain;'
+    // Browser already makes wrapper fill 100vw×100vh when fullscreen.
+    // Video fills wrapper entirely; object-fit:contain letterboxes/pillarboxes.
+    // Controls are absolute overlay on top — no need to subtract their height.
+    return 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;'
   }
   if (!videoReady.value) {
     return 'max-height:54px;object-fit:contain;opacity:0;'
