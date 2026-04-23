@@ -1,7 +1,8 @@
 <template>
   <div ref="wrapper"
-    class="relative rounded-xl overflow-hidden bg-black select-none"
-    style="width: 260px"
+    class="relative bg-black select-none"
+    :class="isFullscreen ? '' : 'rounded-xl overflow-hidden'"
+    :style="isFullscreen ? 'width:100vw;height:100vh;' : 'width:260px'"
     @mouseenter="revealCtrl"
     @mouseleave="startHide"
     @mousemove="revealCtrl">
@@ -11,10 +12,11 @@
       metadata for display:none or zero-height-wrapper elements.
       We control visibility via opacity + sizing instead.
     -->
-    <video ref="el" :src="src" preload="metadata"
+    <video ref="el" :src="src" preload="auto"
       class="w-full block cursor-pointer"
       :style="videoStyle"
       @loadedmetadata="onMeta"
+      @canplay="onCanPlay"
       @timeupdate="onTime"
       @play="playing = true"
       @pause="playing = false"
@@ -71,7 +73,8 @@
     <!-- Controls overlay (video mode) -->
     <div v-if="!audioOnly && videoReady"
       class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-200"
-      :class="[showCtrl || !playing ? 'opacity-100' : 'opacity-0', isFullscreen ? 'px-6 pb-5 pt-16' : 'px-2.5 pb-2 pt-8']">
+      :class="[showCtrl || !playing ? 'opacity-100' : 'opacity-0']"
+      :style="isFullscreen ? 'padding:1.5rem 1.5rem 1.25rem;height:72px;box-sizing:border-box;' : 'padding:2rem 0.625rem 0.5rem;'">
 
       <input type="range" :class="isFullscreen ? 'seek-fs' : 'seek'" class="w-full mb-2"
         :max="duration || 100" :value="currentTime" step="0.1" @input="seek" />
@@ -141,6 +144,7 @@ const showCtrl = ref(true)
 const isFullscreen = ref(false)
 
 let hideTimer: ReturnType<typeof setTimeout> | null = null
+let metaTimer: ReturnType<typeof setTimeout> | null = null
 
 // Video element style: always rendered (no display:none) so Chromium loads metadata.
 // - Before metadata: tiny visible black square (spinner overlay covers it)
@@ -149,6 +153,10 @@ let hideTimer: ReturnType<typeof setTimeout> | null = null
 const videoStyle = computed(() => {
   if (audioOnly.value) {
     return 'width:0;height:0;position:absolute;overflow:hidden;'
+  }
+  if (isFullscreen.value && videoReady.value) {
+    // Fill wrapper (100vw x 100vh), leave room for controls bar (~72px)
+    return 'position:absolute;top:0;left:0;width:100%;height:calc(100vh - 72px);object-fit:contain;'
   }
   if (!videoReady.value) {
     return 'max-height:54px;object-fit:contain;opacity:0;'
@@ -166,16 +174,20 @@ function startHide() {
   hideTimer = setTimeout(() => { showCtrl.value = false }, 2000)
 }
 
-function onMeta() {
+function applyMeta() {
   const v = el.value
-  if (!v) return
-  duration.value = v.duration
+  if (!v || audioOnly.value || videoReady.value) return
+  if (metaTimer) { clearTimeout(metaTimer); metaTimer = null }
+  duration.value = v.duration || 0
   if (v.videoWidth === 0 || v.videoHeight === 0) {
     audioOnly.value = true
   } else {
     videoReady.value = true
   }
 }
+
+function onMeta() { applyMeta() }
+function onCanPlay() { applyMeta() }
 
 function onTime() { currentTime.value = el.value?.currentTime ?? 0 }
 
@@ -228,10 +240,19 @@ function onFullscreenChange() {
   if (isFullscreen.value) revealCtrl()
 }
 
-onMounted(() => document.addEventListener('fullscreenchange', onFullscreenChange))
+onMounted(() => {
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+  // Force load — Electron sometimes ignores preload="auto" until explicit call
+  el.value?.load()
+  // Timeout fallback: if loadedmetadata+canplay never fire, treat as audio-only
+  metaTimer = setTimeout(() => {
+    if (!audioOnly.value && !videoReady.value) audioOnly.value = true
+  }, 4000)
+})
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   if (hideTimer) clearTimeout(hideTimer)
+  if (metaTimer) clearTimeout(metaTimer)
 })
 
 function fmt(s: number) {
@@ -282,28 +303,4 @@ function fmt(s: number) {
 .vol::-webkit-slider-thumb { width: 9px; height: 9px; }
 .vol-fs::-webkit-slider-thumb { width: 16px; height: 16px; }
 
-/* Fullscreen: wrapper fills screen, video centered */
-:fullscreen,
-:-webkit-full-screen {
-  width: 100vw !important;
-  height: 100vh !important;
-  max-width: none !important;
-  border-radius: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-:fullscreen video,
-:-webkit-full-screen video {
-  flex: 1 !important;
-  width: 100% !important;
-  max-height: none !important;
-  min-height: 0 !important;
-  object-fit: contain !important;
-}
-:fullscreen .absolute.inset-x-0.bottom-0,
-:-webkit-full-screen .absolute.inset-x-0.bottom-0 {
-  position: fixed !important;
-}
 </style>
