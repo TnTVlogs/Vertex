@@ -86,6 +86,11 @@ const globalRateLimit = rateLimit({
     skip: (req) => req.path === '/api/v1/health',
 });
 
+app.get('/invite/:code', (req, res) => {
+    const code = encodeURIComponent(req.params.code)
+    res.redirect(302, `/app/#/invite/${code}`)
+});
+
 app.use('/uploads', (_req, res, next) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');

@@ -31,15 +31,13 @@
       <p class="text-xs font-black tracking-[0.3em] italic uppercase">{{ i18n.t('chat.no_logs') }}</p>
     </div>
 
-    <!-- Virtual message list -->
-    <VList
+    <!-- Message list -->
+    <div
       v-else
       ref="vListRef"
-      class="flex-1 px-8 py-6 no-scrollbar"
-      :data="sortedMessages"
-      :bufferSize="4"
+      class="flex-1 px-8 py-6 no-scrollbar overflow-y-auto"
     >
-      <template #default="{ item: msg, index }">
+      <template v-for="(msg, index) in sortedMessages" :key="msg.id">
         <div
           class="flex group animate-in fade-in slide-in-from-bottom-2 duration-500"
           :class="[
@@ -131,7 +129,7 @@
           </div>
         </div>
       </template>
-    </VList>
+    </div>
 
     <!-- Image lightbox -->
     <Teleport to="body">
@@ -174,7 +172,6 @@
 
 <script setup lang="ts">
 import { ref, nextTick, computed, watch } from 'vue'
-import { VList } from 'virtua/vue'
 import UserAvatar from './UserAvatar.vue'
 import AudioPlayer from './AudioPlayer.vue'
 import VideoPlayer from './VideoPlayer.vue'
@@ -193,7 +190,7 @@ const settingsStore = useSettingsStore()
 const i18n = useI18nStore()
 const messageStore = useMessageStore()
 
-const vListRef = ref<InstanceType<typeof VList> | null>(null)
+const vListRef = ref<HTMLElement | null>(null)
 const sortedMessages = computed((): Message[] => chatStore.sortedMessages)
 const lightboxUrl = ref<string | null>(null)
 const lightboxEl = ref<HTMLElement | null>(null)
@@ -245,21 +242,18 @@ function formatMessage(text: string) {
 
 function scrollToBottom() {
   nextTick(() => {
-    const msgs = sortedMessages.value
-    if (vListRef.value && msgs.length > 0) {
-      vListRef.value.scrollToIndex(msgs.length - 1, { align: 'end' })
+    if (vListRef.value) {
+      vListRef.value.scrollTop = vListRef.value.scrollHeight
     }
   })
 }
 
 async function handleLoadOlder() {
-  const prevCount = sortedMessages.value.length
+  const prevScrollHeight = vListRef.value?.scrollHeight ?? 0
   await messageStore.loadOlderMessages()
   nextTick(() => {
-    const newCount = sortedMessages.value.length
-    const addedCount = newCount - prevCount
-    if (vListRef.value && addedCount > 0) {
-      vListRef.value.scrollToIndex(addedCount, { align: 'start' })
+    if (vListRef.value) {
+      vListRef.value.scrollTop = vListRef.value.scrollHeight - prevScrollHeight
     }
   })
 }
