@@ -22,7 +22,7 @@ const sdpSchema = z.object({
 const iceSchema = z.object({
     callId: z.string().uuid(),
     targetUserId: z.string().uuid(),
-    candidate: z.record(z.unknown()),
+    candidate: z.record(z.string(), z.unknown()),
 });
 
 function getUserSockets(userToSockets: Map<string, Set<string>>, userId: string): Set<string> {
