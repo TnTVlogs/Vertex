@@ -64,7 +64,7 @@
           <div class="flex flex-col max-w-[70%]" :class="msg.authorId === authStore.user?.id ? 'items-end' : 'items-start'">
             <div v-if="shouldShowAuthor(msg, index)" class="flex items-center mb-1 space-x-2 px-1">
               <span class="text-[9px] font-black uppercase tracking-widest text-[var(--v-text-secondary)]">
-                {{ msg.author?.username || 'ANONYMOUS' }}
+                {{ msg.author?.displayName || msg.author?.username || 'ANONYMOUS' }}
               </span>
               <span class="text-[8px] font-mono text-[var(--v-text-secondary)] opacity-40">
                 {{ formatTime(msg.createdAt) }}
