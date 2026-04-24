@@ -14,6 +14,7 @@ import serverRoutes from './routes/servers';
 import messagesRoutes from './routes/messages';
 import adminRoutes from './routes/admin';
 import userRoutes from './routes/users';
+import mediaRoutes from './routes/media';
 import { handleSocketConnections } from './socket/socketHandler';
 import { serverService } from './services/serverService';
 import { errorHandler } from './middleware/errorHandler';
@@ -98,6 +99,7 @@ app.use('/api/v1/servers', serverRoutes);
 app.use('/api/v1/messages', messagesRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/media', mediaRoutes);
 
 app.get('/api/v1/health', (_req, res) => {
     res.json({ status: 'ok' });

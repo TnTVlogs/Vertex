@@ -1,5 +1,6 @@
 <template>
-  <div ref="wrapper"
+  <AudioPlayer v-if="isAudioFallback && fallbackBlobUrl" :src="fallbackBlobUrl" />
+  <div v-else ref="wrapper"
     class="relative rounded-xl overflow-hidden bg-black select-none"
     style="width:260px"
     @mouseenter="revealCtrl"
@@ -11,7 +12,7 @@
       metadata for display:none or zero-height-wrapper elements.
       We control visibility via opacity + sizing instead.
     -->
-    <video ref="el" :src="src" preload="auto"
+    <video ref="el" :src="src" preload="auto" crossorigin="anonymous"
       class="w-full block cursor-pointer"
       :style="videoStyle"
       @loadedmetadata="onMeta"
@@ -20,10 +21,17 @@
       @play="playing = true"
       @pause="playing = false"
       @ended="playing = false"
+      @error="onVideoError"
       @click="toggle" />
 
+    <!-- Error state -->
+    <div v-if="videoError"
+      class="absolute inset-0 flex items-center justify-center" style="height:54px">
+      <span class="text-[9px] text-white/50 font-mono">failed to load</span>
+    </div>
+
     <!-- Spinner overlay while waiting for metadata -->
-    <div v-if="!videoReady"
+    <div v-else-if="!videoReady"
       class="absolute inset-0 flex items-center justify-center" style="height:54px">
       <div class="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
     </div>
@@ -95,8 +103,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import AudioPlayer from './AudioPlayer.vue'
+import { ENV } from '../utils/env'
 
-defineProps<{ src: string }>()
+const props = defineProps<{ src: string }>()
 
 const wrapper = ref<HTMLElement | null>(null)
 const el = ref<HTMLVideoElement | null>(null)
@@ -106,6 +116,9 @@ const muted = ref(false)
 const volume = ref(1)
 const prevVolume = ref(1)
 const videoReady = ref(false)
+const videoError = ref(false)
+const isAudioFallback = ref(false)
+const fallbackBlobUrl = ref<string | null>(null)
 const currentTime = ref(0)
 const duration = ref(0)
 const showCtrl = ref(true)
@@ -147,9 +160,9 @@ function onCanPlay() { applyMeta() }
 function onTime() { currentTime.value = el.value?.currentTime ?? 0 }
 
 function toggle() {
-  if (!el.value) return
+  if (!el.value || isAudioFallback.value || videoError.value) return
   if (playing.value) el.value.pause()
-  else el.value.play()
+  else el.value.play().catch(() => {})
 }
 
 function seek(e: Event) {
@@ -195,19 +208,57 @@ function onFullscreenChange() {
   if (isFullscreen.value) revealCtrl()
 }
 
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function triggerAudioFallback() {
+  try {
+    // Extract relative path from upload URL: '.../uploads/attachments/UUID.mp4' → 'attachments/UUID.mp4'
+    const filePart = new URL(props.src).pathname.replace(/^\/uploads\//, '')
+    const transcodeUrl = `${ENV.API_URL}/media/transcode?file=${encodeURIComponent(filePart)}`
+    const res = await fetch(transcodeUrl)
+    if (!res.ok) throw new Error(`transcode ${res.status}`)
+    const buf = await res.arrayBuffer()
+    fallbackBlobUrl.value = await blobToDataUrl(new Blob([buf], { type: 'audio/mpeg' }))
+    isAudioFallback.value = true
+  } catch {
+    videoError.value = true
+  }
+}
+
+function onVideoError() {
+  const err = el.value?.error
+  if (metaTimer) { clearTimeout(metaTimer); metaTimer = null }
+  if (err?.code === 4) {
+    triggerAudioFallback()
+  } else {
+    console.error('[VideoPlayer] media error:', err?.code, err?.message)
+    videoError.value = true
+  }
+  videoReady.value = false
+}
+
 onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
-  // Force load — Electron sometimes ignores preload="auto" until explicit call
   el.value?.load()
-  // Timeout fallback: if loadedmetadata+canplay never fire, treat as audio-only
   metaTimer = setTimeout(() => {
-    if (!videoReady.value) videoReady.value = true
+    if (!videoReady.value && !videoError.value && !isAudioFallback.value) {
+      videoError.value = true
+    }
   }, 4000)
 })
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   if (hideTimer) clearTimeout(hideTimer)
   if (metaTimer) clearTimeout(metaTimer)
+  if (fallbackBlobUrl.value) URL.revokeObjectURL(fallbackBlobUrl.value)
 })
 
 function fmt(s: number) {

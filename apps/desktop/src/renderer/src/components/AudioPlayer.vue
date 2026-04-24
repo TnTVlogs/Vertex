@@ -63,7 +63,7 @@ const duration = ref(0)
 function toggle() {
   if (!el.value) return
   if (playing.value) { el.value.pause(); playing.value = false }
-  else { el.value.play(); playing.value = true }
+  else { el.value.play().then(() => { playing.value = true }).catch(() => {}) }
 }
 
 function toggleMute() {
@@ -98,6 +98,7 @@ function seek(e: Event) {
 
 function onTime() { currentTime.value = el.value?.currentTime ?? 0 }
 function onMeta() { duration.value = el.value?.duration ?? 0 }
+
 
 function fmt(s: number) {
   if (!s || !isFinite(s)) return '0:00'

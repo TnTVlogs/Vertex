@@ -204,7 +204,11 @@ app.whenReady().then(() => {
         { urls: ['https://vertex.sergidalmau.dev/uploads/*'] },
         (details, callback) => {
             const headers = { ...details.responseHeaders }
-            headers['cross-origin-resource-policy'] = ['cross-origin']
+            // Remove any existing CORP header regardless of case (Electron preserves original casing)
+            Object.keys(headers).forEach(k => {
+                if (k.toLowerCase() === 'cross-origin-resource-policy') delete headers[k]
+            })
+            headers['Cross-Origin-Resource-Policy'] = ['cross-origin']
             callback({ responseHeaders: headers })
         }
     )
