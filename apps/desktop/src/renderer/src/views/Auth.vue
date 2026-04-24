@@ -158,7 +158,7 @@ async function handleSubmit() {
       const pendingInvite = localStorage.getItem('vertex_pending_invite')
       if (pendingInvite) {
         localStorage.removeItem('vertex_pending_invite')
-        window.location.href = `${import.meta.env.BASE_URL}invite/${pendingInvite}`  
+        window.location.hash = `/invite/${pendingInvite}`
       }
     }
   } catch (err: any) {
