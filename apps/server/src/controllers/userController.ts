@@ -4,28 +4,39 @@ import prisma from '../services/prisma';
 import logger from '../utils/logger';
 import path from 'path';
 import fs from 'fs';
+import { spawn } from 'child_process';
+
+const AUDIO_TRANSCODE_MIMES = new Set(['audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/m4a']);
+
+function transcodeToMp3(inputPath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const outputPath = inputPath.replace(/\.[^.]+$/, '.mp3');
+        const ff = spawn('ffmpeg', ['-i', inputPath, '-vn', '-acodec', 'libmp3lame', '-ab', '128k', '-y', outputPath]);
+        ff.stderr.on('data', () => {});
+        ff.on('error', reject);
+        ff.on('close', (code) => {
+            if (code === 0) { fs.unlink(inputPath, () => {}); resolve(outputPath); }
+            else reject(new Error(`ffmpeg exit ${code}`));
+        });
+    });
+}
 
 const SERVER_BASE_URL = (process.env.SERVER_BASE_URL ?? '').replace(/\/$/, '');
 
-const authorSelect = { id: true, username: true, email: true, avatarUrl: true };
+const authorSelect = { id: true, username: true, displayName: true, avatarUrl: true };
 
 export const updateProfile = async (req: AuthRequest, res: Response) => {
-    const { username } = req.body;
+    const { displayName } = req.body;
     const userId = req.user.userId;
 
-    if (typeof username !== 'string' || username.trim().length < 2 || username.trim().length > 32) {
-        return res.status(400).json({ error: 'Username must be 2–32 characters' });
+    if (typeof displayName !== 'string' || displayName.trim().length < 1 || displayName.trim().length > 50) {
+        return res.status(400).json({ error: 'Display name must be 1–50 characters' });
     }
 
     try {
-        const existing = await prisma.user.findUnique({ where: { username: username.trim() } });
-        if (existing && existing.id !== userId) {
-            return res.status(409).json({ error: 'Username already taken' });
-        }
-
         const user = await prisma.user.update({
             where: { id: userId },
-            data: { username: username.trim() },
+            data: { displayName: displayName.trim() },
             select: authorSelect,
         });
 
@@ -72,6 +83,19 @@ export const uploadAvatar = async (req: AuthRequest, res: Response) => {
 export const uploadAttachment = async (req: AuthRequest, res: Response) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    const url = `${SERVER_BASE_URL}/uploads/attachments/${req.file.filename}`;
-    res.json({ url, filename: req.file.originalname, mimetype: req.file.mimetype, size: req.file.size });
+    let filename = req.file.filename;
+    let mimetype = req.file.mimetype;
+
+    if (AUDIO_TRANSCODE_MIMES.has(mimetype)) {
+        try {
+            const outputPath = await transcodeToMp3(req.file.path);
+            filename = path.basename(outputPath);
+            mimetype = 'audio/mpeg';
+        } catch (err) {
+            logger.warn({ err }, 'Audio transcode on upload failed, serving original');
+        }
+    }
+
+    const url = `${SERVER_BASE_URL}/uploads/attachments/${filename}`;
+    res.json({ url, filename: req.file.originalname, mimetype, size: req.file.size });
 };

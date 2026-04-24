@@ -176,11 +176,11 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     // ── UPDATE PROFILE ────────────────────────────────────────────────────────
-    async function updateProfile(username: string): Promise<void> {
+    async function updateProfile(displayName: string): Promise<void> {
         const res = await fetch(`${ENV.API_URL}/users/profile`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.value}` },
-            body: JSON.stringify({ username }),
+            body: JSON.stringify({ displayName }),
         })
         if (!res.ok) {
             const err = await res.json().catch(() => ({}))

@@ -1,7 +1,7 @@
 export interface User {
     id: string;
     username: string;
-    email: string;
+    displayName?: string | null;
     avatarUrl?: string;
     status: 'online' | 'offline' | 'idle' | 'dnd';
     isAdmin?: boolean;
@@ -18,6 +18,7 @@ export interface Message {
     author?: {
         id: string;
         username: string;
+        displayName?: string | null;
         avatarUrl?: string;
     };
     status?: 'sending' | 'error' | 'sent';

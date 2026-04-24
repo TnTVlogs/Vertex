@@ -88,8 +88,9 @@ const globalRateLimit = rateLimit({
 
 app.use('/uploads', (_req, res, next) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     next();
-}, express.static(path.join(process.cwd(), 'uploads')));
+}, express.static(path.join(process.cwd(), 'uploads'), { maxAge: '1y', immutable: true }));
 
 app.use('/api/v1', globalRateLimit);
 
