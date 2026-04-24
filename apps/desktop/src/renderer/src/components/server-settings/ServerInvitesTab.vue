@@ -72,7 +72,7 @@ const selectedExpiry = ref<number | null>(7)
 
 const inviteLink = computed(() => {
   const code = serverStore.currentServer?.inviteCode
-  return code ? `https://vertex.sergidalmau.dev/invite/${code}` : ''
+  return code ? `https://vertex.sergidalmau.dev/#/invite/${code}` : ''
 })
 
 function formatTimeRemaining(expiresAt: string | null | undefined): string {

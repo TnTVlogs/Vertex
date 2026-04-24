@@ -10,6 +10,7 @@ import { serverSettingsService } from '../services/serverSettingsService';
 import { Tier } from '../config/limits.config';
 import { getLimits } from '../services/tierService';
 import logger from '../utils/logger';
+import { registerCallHandler } from './callHandler';
 
 const socketToUser = new Map<string, string>();
 const userToSockets = new Map<string, Set<string>>();
@@ -225,6 +226,9 @@ export const handleSocketConnections = (io: Server) => {
             }
         });
 
+        // ── Call signaling ───────────────────────────────────────────────────
+        registerCallHandler(io, socket, userToSockets);
+
         socket.on('typing', (data: { channelId?: string; recipientId?: string }) => {
             const userId = socket.data.userId as string;
             if (data.channelId) {
@@ -258,6 +262,25 @@ export const handleSocketConnections = (io: Server) => {
                 removeUserSocket(userId, socket.id);
                 await setPresence(userId, 'offline');
                 socket.broadcast.emit('presence-update', { userId, status: 'offline' });
+            }
+        });
+
+        socket.on('disconnecting', async () => {
+            const uid = socket.data.userId as string | undefined;
+            if (!uid) return;
+            const remaining = userToSockets.get(uid);
+            if (remaining && remaining.size <= 1) {
+                // Last socket for this user — end any active call
+                const { callService } = await import('../services/callService');
+                const call = await callService.getByUserId(uid);
+                if (call && call.state !== 'ended') {
+                    await callService.end(call.id);
+                    const otherId = callService.otherParticipant(call, uid);
+                    const otherSockets = userToSockets.get(otherId) ?? new Set();
+                    for (const sid of otherSockets) {
+                        io.to(sid).emit('call:ended', { callId: call.id, reason: 'disconnected' });
+                    }
+                }
             }
         });
     });
