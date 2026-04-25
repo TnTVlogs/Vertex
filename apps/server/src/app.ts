@@ -18,6 +18,7 @@ import mediaRoutes from './routes/media';
 import { handleSocketConnections } from './socket/socketHandler';
 import { serverService } from './services/serverService';
 import { errorHandler } from './middleware/errorHandler';
+import { requireAuth } from './middleware/requireAuth';
 import logger from './utils/logger';
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
@@ -106,6 +107,21 @@ app.use('/api/v1/messages', messagesRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/media', mediaRoutes);
+
+// ICE servers config — credentials served dynamically, never baked into client build
+app.get('/api/v1/call/ice-servers', requireAuth, (_req, res) => {
+    const servers: object[] = [
+        { urls: process.env.STUN_URL ?? 'stun:stun.l.google.com:19302' },
+    ];
+    if (process.env.TURN_URL && process.env.TURN_USER && process.env.TURN_PASS) {
+        servers.push({
+            urls: process.env.TURN_URL,
+            username: process.env.TURN_USER,
+            credential: process.env.TURN_PASS,
+        });
+    }
+    res.json({ iceServers: servers });
+});
 
 app.get('/api/v1/health', (_req, res) => {
     res.json({ status: 'ok' });

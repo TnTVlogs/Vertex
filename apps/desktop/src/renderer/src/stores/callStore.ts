@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import {
     createPeerConnection,
+    fetchIceServers,
     getAudioStream,
     addStreamToPeerConnection,
     createAndSendOffer,
@@ -10,9 +11,9 @@ import {
     addIceCandidate,
     getCameraTrack,
     getScreenTrack,
-    renegotiate,
 } from '../utils/webrtc'
 import type { Socket } from 'socket.io-client'
+import { useAuthStore } from './authStore'
 
 export type CallState = 'idle' | 'ringing-out' | 'ringing-in' | 'connecting' | 'active' | 'ended'
 export type CallType = 'audio' | 'video'
@@ -73,6 +74,12 @@ export const useCallStore = defineStore('call', () => {
         callState.value = 'ringing-in'
     }
 
+    async function makePC(callId: string, peerId: string, socket: Socket): Promise<RTCPeerConnection> {
+        const authStore = useAuthStore()
+        const iceServers = await fetchIceServers(authStore.token ?? '')
+        return createPeerConnection(callId, peerId, socket, iceServers, setRemoteStream, setConnectionState)
+    }
+
     // Caller: remote accepted → create PC, get stream, send offer
     async function onAccepted(socket: Socket) {
         if (!callInfo.value || callState.value !== 'ringing-out') return
@@ -81,7 +88,7 @@ export const useCallStore = defineStore('call', () => {
         try {
             const stream = await getAudioStream()
             localStream.value = stream
-            pc.value = createPeerConnection(callId, peerId, socket, setRemoteStream, setConnectionState)
+            pc.value = await makePC(callId, peerId, socket)
             addStreamToPeerConnection(pc.value, stream)
             await createAndSendOffer(pc.value, callId, peerId, socket)
         } catch {
@@ -98,7 +105,7 @@ export const useCallStore = defineStore('call', () => {
         try {
             const stream = await getAudioStream()
             localStream.value = stream
-            pc.value = createPeerConnection(callId, peerId, socket, setRemoteStream, setConnectionState)
+            pc.value = await makePC(callId, peerId, socket)
             addStreamToPeerConnection(pc.value, stream)
         } catch {
             reset()
@@ -149,8 +156,7 @@ export const useCallStore = defineStore('call', () => {
                 if (sender) {
                     await sender.replaceTrack(track)
                 } else {
-                    pc.value.addTrack(track, localStream.value!)
-                    await renegotiate(pc.value, callId, peerId, socket)
+                    pc.value.addTrack(track, localStream.value!) // onnegotiationneeded fires automatically
                 }
                 isVideoOn.value = true
                 socket.emit('call:video-toggle', { callId, enabled: true })
@@ -160,7 +166,7 @@ export const useCallStore = defineStore('call', () => {
 
     async function toggleScreenShare(socket: Socket) {
         if (!pc.value || !callInfo.value) return
-        const { callId, peerId } = callInfo.value
+        const { callId } = callInfo.value
 
         if (isScreenSharing.value) {
             const sender = pc.value.getSenders().find(s => s.track?.kind === 'video')
@@ -173,14 +179,12 @@ export const useCallStore = defineStore('call', () => {
             try {
                 const track = await getScreenTrack()
                 screenTrack = track
-                // When user stops via browser UI
                 track.onended = () => toggleScreenShare(socket)
                 const sender = pc.value.getSenders().find(s => s.track?.kind === 'video')
                 if (sender) {
                     await sender.replaceTrack(track)
                 } else {
-                    pc.value.addTrack(track, localStream.value!)
-                    await renegotiate(pc.value, callId, peerId, socket)
+                    pc.value.addTrack(track, localStream.value!) // onnegotiationneeded fires automatically
                 }
                 isScreenSharing.value = true
                 socket.emit('call:share-screen', { callId, enabled: true })

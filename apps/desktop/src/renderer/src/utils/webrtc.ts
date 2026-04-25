@@ -1,17 +1,34 @@
 import type { Socket } from 'socket.io-client'
+import { ENV } from './env'
 
-const RTC_CONFIG: RTCConfiguration = {
-    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+const FALLBACK_ICE: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }]
+
+let cachedIceServers: RTCIceServer[] | null = null
+
+export async function fetchIceServers(token: string): Promise<RTCIceServer[]> {
+    if (cachedIceServers) return cachedIceServers
+    try {
+        const res = await fetch(`${ENV.API_URL}/call/ice-servers`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+            const data = await res.json()
+            cachedIceServers = data.iceServers
+            return cachedIceServers!
+        }
+    } catch {}
+    return FALLBACK_ICE
 }
 
 export function createPeerConnection(
     callId: string,
     peerId: string,
     socket: Socket,
+    iceServers: RTCIceServer[],
     onRemoteStream: (stream: MediaStream) => void,
     onConnectionStateChange: (state: RTCPeerConnectionState) => void,
 ): RTCPeerConnection {
-    const pc = new RTCPeerConnection(RTC_CONFIG)
+    const pc = new RTCPeerConnection({ iceServers })
 
     pc.ontrack = (event) => {
         if (event.streams[0]) onRemoteStream(event.streams[0])
@@ -29,6 +46,24 @@ export function createPeerConnection(
 
     pc.onconnectionstatechange = () => {
         onConnectionStateChange(pc.connectionState)
+    }
+
+    // ICE restart on failure
+    pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'failed') {
+            pc.restartIce()
+            // Caller must send new offer with iceRestart — handled via onnegotiationneeded
+        }
+    }
+
+    // Automatic renegotiation when tracks added/replaced trigger negotiation needed
+    pc.onnegotiationneeded = async () => {
+        try {
+            const offer = await pc.createOffer()
+            if (pc.signalingState !== 'stable') return
+            await pc.setLocalDescription(offer)
+            socket.emit('call:sdp-offer', { callId, targetUserId: peerId, sdp: offer.sdp })
+        } catch {}
     }
 
     return pc
