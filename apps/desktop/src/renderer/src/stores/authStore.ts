@@ -127,7 +127,10 @@ export const useAuthStore = defineStore('auth', () => {
             body: JSON.stringify({ email, password })
         })
 
-        if (!response.ok) throw new Error('Login failed')
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}))
+            throw new Error(err.error || 'Login failed')
+        }
 
         const data = await response.json()
         user.value = data.user

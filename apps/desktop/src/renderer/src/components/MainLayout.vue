@@ -112,7 +112,7 @@ const onAddFriend = async (username: string) => {
   if (!username) return
   const res = await fetch(`${ENV.API_URL}/social/request`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authStore.token}` },
     body: JSON.stringify({ fromId: authStore.user?.id, toUsername: username })
   })
   if (res.ok) {

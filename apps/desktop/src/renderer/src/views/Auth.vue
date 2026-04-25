@@ -100,11 +100,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAuthStore } from '../stores/authStore'
+import { useNavigationStore } from '../stores/navigationStore'
 import { useI18nStore } from '../stores/i18nStore'
 import { ENV } from '../utils/env'
 import pkg from '../../../../package.json'
 
 const authStore = useAuthStore()
+const navStore = useNavigationStore()
 const i18n = useI18nStore()
 const appVersion = pkg.version
 const isLogin = ref(true)
@@ -138,6 +140,7 @@ async function handleSubmit() {
   try {
     if (isLogin.value) {
       await authStore.login(email.value, password.value)
+      navStore.setActiveView('home')
     } else {
       const response = await fetch(`${ENV.API_URL}/auth/register`, {
         method: 'POST',
