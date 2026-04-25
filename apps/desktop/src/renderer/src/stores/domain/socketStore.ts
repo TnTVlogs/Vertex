@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../authStore';
+import { useCallStore } from '../callStore';
 import { Message } from '@shared/models';
 import { ENV } from '../../utils/env';
 import { notificationService } from '../../services/notificationService';
@@ -73,11 +74,58 @@ export const useSocketStore = defineStore('socket', {
                 this.socket.on('stop-typing', (data: { userId: string }) => {
                     delete this.typingUsers[data.userId];
                 });
+
+                // ── Call events ──────────────────────────────────────────────
+                const socket = this.socket
+                this.socket.on('call:initiated', (data: { callId: string; callType: string; targetUserId: string }) => {
+                    const callStore = useCallStore()
+                    const friend = (callbacks as any).getFriendName?.(data.targetUserId) ?? data.targetUserId
+                    callStore.onInitiated(data.callId, data.callType as any, data.targetUserId, friend)
+                })
+                this.socket.on('call:incoming', (data: { callId: string; callType: string; callerId: string }) => {
+                    const callStore = useCallStore()
+                    const friend = (callbacks as any).getFriendName?.(data.callerId) ?? data.callerId
+                    callStore.onIncoming(data.callId, data.callType as any, data.callerId, friend)
+                    notificationService.notify('Incoming call', `${friend} is calling you`)
+                })
+                this.socket.on('call:accepted', async () => {
+                    const callStore = useCallStore()
+                    await callStore.onAccepted(socket)
+                })
+                this.socket.on('call:rejected', () => {
+                    useCallStore().reset()
+                })
+                this.socket.on('call:ended', () => {
+                    useCallStore().reset()
+                })
+                this.socket.on('call:timeout', () => {
+                    useCallStore().reset()
+                })
+                this.socket.on('call:sdp-offer', async (data: { callId: string; sdp: string }) => {
+                    const callStore = useCallStore()
+                    await callStore.onSdpOffer(data.sdp, socket)
+                })
+                this.socket.on('call:sdp-answer', async (data: { callId: string; sdp: string }) => {
+                    const callStore = useCallStore()
+                    await callStore.onSdpAnswer(data.sdp)
+                })
+                this.socket.on('call:ice-candidate', async (data: { candidate: RTCIceCandidateInit }) => {
+                    const callStore = useCallStore()
+                    await callStore.onIceCandidate(data.candidate)
+                })
             }
         },
 
         joinChannel(channelId: string) {
             this.socket?.emit('join-channel', channelId);
+        },
+
+        initiateCall(targetUserId: string, callType: 'audio' | 'video') {
+            this.socket?.emit('call:initiate', { targetUserId, callType })
+        },
+
+        getSocket(): Socket | null {
+            return this.socket
         },
 
         emitTyping(channelId?: string | null, recipientId?: string | null) {

@@ -67,8 +67,12 @@ export const useChatStore = defineStore('chat', {
                 },
                 onFriendResponse: (data) => {
                     friendStore.handleResponse(data);
-                }
-            });
+                },
+                getFriendName: (userId: string) => {
+                    const f = friendStore.friends.find((fr: any) => fr.id === userId)
+                    return f?.displayName ?? f?.username ?? userId
+                },
+            } as any);
         },
 
         async sendMessage(content: string, attachmentUrl?: string) {
