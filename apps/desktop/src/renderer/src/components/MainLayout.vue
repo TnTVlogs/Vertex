@@ -18,6 +18,7 @@ import UserAvatar from '../components/UserAvatar.vue'
 import IncomingCallModal from '../components/IncomingCallModal.vue'
 import CallOverlay from '../components/CallOverlay.vue'
 import { useSocketStore } from '../stores/domain/socketStore'
+import { useUnreadStore } from '../stores/unreadStore'
 
 const authStore = useAuthStore()
 const navStore = useNavigationStore()
@@ -27,6 +28,7 @@ const serverStore = useServerStore()
 const i18n = useI18nStore()
 const toastStore = useToastStore()
 const socketStore = useSocketStore()
+const unreadStore = useUnreadStore()
 
 const friendsTab = ref<'online' | 'all' | 'pending'>('online')
 const showAddFriendModal = ref(false)
@@ -53,9 +55,10 @@ function getLastChannel(serverId: string): string | null {
 // Sync store on navigation
 function openDM(recipientId: string) {
   if (navStore.activeRecipientId === recipientId && navStore.activeView === 'home') return
-  uiStore.closeAll() // Close mobile sidebar on navigation
+  uiStore.closeAll()
   navStore.setDM(recipientId)
   chatStore.clearMessages()
+  unreadStore.clearDM(recipientId)
 }
 
 function openChannel(serverId: string, channelId: string) {
@@ -283,14 +286,18 @@ const onServerAction = async (value: string) => {
 
         <template v-else-if="navStore.activeView === 'home' || navStore.activeView === 'friends'">
           <section>
-             <div @click="navStore.setActiveView('friends')" 
+             <div @click="navStore.setActiveView('friends')"
                   class="flex items-center px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-200 group"
                   :class="(navStore.activeView === 'friends' || (navStore.activeView === 'home' && !navStore.activeRecipientId)) ? 'bg-[var(--v-accent)] text-[var(--v-bg-base)] font-bold shadow-[0_4px_15px_var(--v-accent-glow)]' : 'text-[var(--v-text-secondary)] hover:bg-white/5 hover:text-[var(--v-text-primary)]'"
              >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" class="mr-3">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" class="mr-3 shrink-0">
                 <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
               </svg>
-              {{ i18n.t('sidebar.friends') }}
+              <span class="flex-1">{{ i18n.t('sidebar.friends') }}</span>
+              <span
+                v-if="unreadStore.pendingRequestCount > 0"
+                class="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center shrink-0"
+              >{{ unreadStore.pendingRequestCount > 9 ? '9+' : unreadStore.pendingRequestCount }}</span>
             </div>
           </section>
 
@@ -303,11 +310,15 @@ const onServerAction = async (value: string) => {
                    :class="navStore.activeRecipientId === friend.id ? 'bg-white/10 text-white shadow-sm' : 'text-[var(--v-text-secondary)] hover:bg-white/5 hover:text-white'"
               >
                 <div class="relative mr-3 w-8 h-8 rounded-lg bg-[var(--v-bg-surface)] flex items-center justify-center shrink-0 border border-[var(--v-border)]">
-                  <span class="text-xs font-bold">{{ friend.username.charAt(0).toUpperCase() }}</span>
+                  <span class="text-xs font-bold">{{ (friend.displayName || friend.username).charAt(0).toUpperCase() }}</span>
                   <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--v-bg-sidebar)]"
                        :class="friend.status === 'online' ? 'bg-[var(--v-accent)]' : 'bg-zinc-600'"></div>
                 </div>
-                <span class="text-sm truncate font-medium">{{ friend.username }}</span>
+                <span class="text-sm truncate font-medium flex-1">{{ friend.displayName || friend.username }}</span>
+                <span
+                  v-if="unreadStore.getDMCount(friend.id) > 0"
+                  class="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center shrink-0"
+                >{{ unreadStore.getDMCount(friend.id) > 9 ? '9+' : unreadStore.getDMCount(friend.id) }}</span>
               </div>
             </div>
           </section>

@@ -3,8 +3,9 @@ import { useSocketStore } from './domain/socketStore';
 import { useFriendStore } from './domain/friendStore';
 import { useServerStore } from './domain/serverStore';
 import { useMessageStore } from './domain/messageStore';
-
 import { useNavigationStore } from './navigationStore';
+import { useAuthStore } from './authStore';
+import { useUnreadStore } from './unreadStore';
 
 export const useChatStore = defineStore('chat', {
     state: () => ({
@@ -58,6 +59,15 @@ export const useChatStore = defineStore('chat', {
             useSocketStore().connect(this.activeChannelId, {
                 onMessage: (msg) => {
                     messageStore.addMessage(msg);
+                    const authStore = useAuthStore()
+                    const navStore = useNavigationStore()
+                    const unreadStore = useUnreadStore()
+                    // Increment unread for DMs not currently open
+                    if (msg.authorId && msg.authorId !== authStore.user?.id && !msg.channelId) {
+                        if (navStore.activeRecipientId !== msg.authorId) {
+                            unreadStore.incrementDM(msg.authorId)
+                        }
+                    }
                 },
                 onPresenceUpdate: (data) => {
                     friendStore.updatePresence(data.userId, data.status);
