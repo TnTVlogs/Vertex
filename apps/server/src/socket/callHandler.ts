@@ -180,4 +180,24 @@ export function registerCallHandler(
 
         emit(targetUserId, 'call:ice-candidate', { callId, candidate, fromUserId: userId });
     });
+
+    // ── call:video-toggle ───────────────────────────────────────────────────
+    socket.on('call:video-toggle', async (data: unknown) => {
+        const parsed = z.object({ callId: z.string().uuid(), enabled: z.boolean() }).safeParse(data);
+        if (!parsed.success) return;
+        const call = await callService.get(parsed.data.callId);
+        if (!call || !callService.isParticipant(call, userId)) return;
+        const other = callService.otherParticipant(call, userId);
+        emit(other, 'call:video-toggle', { enabled: parsed.data.enabled, fromUserId: userId });
+    });
+
+    // ── call:share-screen ───────────────────────────────────────────────────
+    socket.on('call:share-screen', async (data: unknown) => {
+        const parsed = z.object({ callId: z.string().uuid(), enabled: z.boolean() }).safeParse(data);
+        if (!parsed.success) return;
+        const call = await callService.get(parsed.data.callId);
+        if (!call || !callService.isParticipant(call, userId)) return;
+        const other = callService.otherParticipant(call, userId);
+        emit(other, 'call:share-screen', { enabled: parsed.data.enabled, fromUserId: userId });
+    });
 }

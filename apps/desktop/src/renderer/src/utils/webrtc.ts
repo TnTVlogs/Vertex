@@ -38,6 +38,31 @@ export async function getAudioStream(): Promise<MediaStream> {
     return navigator.mediaDevices.getUserMedia({ audio: true, video: false })
 }
 
+export async function getCameraTrack(): Promise<MediaStreamTrack> {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    return stream.getVideoTracks()[0]
+}
+
+export async function getScreenTrack(): Promise<MediaStreamTrack> {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+    return stream.getVideoTracks()[0]
+}
+
+export function getVideoSender(pc: RTCPeerConnection): RTCRtpSender | undefined {
+    return pc.getSenders().find(s => s.track?.kind === 'video' || s.track === null && s.dtmf === null)
+}
+
+export async function renegotiate(
+    pc: RTCPeerConnection,
+    callId: string,
+    peerId: string,
+    socket: Socket,
+) {
+    const offer = await pc.createOffer()
+    await pc.setLocalDescription(offer)
+    socket.emit('call:sdp-offer', { callId, targetUserId: peerId, sdp: offer.sdp })
+}
+
 export function addStreamToPeerConnection(pc: RTCPeerConnection, stream: MediaStream) {
     stream.getTracks().forEach(track => pc.addTrack(track, stream))
 }

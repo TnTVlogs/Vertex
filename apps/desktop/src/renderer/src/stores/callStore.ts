@@ -8,6 +8,9 @@ import {
     handleOfferAndSendAnswer,
     handleAnswer,
     addIceCandidate,
+    getCameraTrack,
+    getScreenTrack,
+    renegotiate,
 } from '../utils/webrtc'
 import type { Socket } from 'socket.io-client'
 
@@ -27,7 +30,11 @@ export const useCallStore = defineStore('call', () => {
     const localStream = ref<MediaStream | null>(null)
     const remoteStream = ref<MediaStream | null>(null)
     const isMuted = ref(false)
+    const isVideoOn = ref(false)
+    const isScreenSharing = ref(false)
     const pc = ref<RTCPeerConnection | null>(null)
+    let cameraTrack: MediaStreamTrack | null = null
+    let screenTrack: MediaStreamTrack | null = null
 
     function reset() {
         callState.value = 'idle'
@@ -36,6 +43,10 @@ export const useCallStore = defineStore('call', () => {
         localStream.value = null
         remoteStream.value = null
         isMuted.value = false
+        isVideoOn.value = false
+        isScreenSharing.value = false
+        cameraTrack?.stop(); cameraTrack = null
+        screenTrack?.stop(); screenTrack = null
         pc.value?.close()
         pc.value = null
     }
@@ -120,6 +131,63 @@ export const useCallStore = defineStore('call', () => {
         isMuted.value = enabled
     }
 
+    async function toggleCamera(socket: Socket) {
+        if (!pc.value || !callInfo.value) return
+        const { callId, peerId } = callInfo.value
+
+        if (isVideoOn.value) {
+            const sender = pc.value.getSenders().find(s => s.track?.kind === 'video')
+            if (sender) await sender.replaceTrack(null)
+            cameraTrack?.stop(); cameraTrack = null
+            isVideoOn.value = false
+            socket.emit('call:video-toggle', { callId, enabled: false })
+        } else {
+            try {
+                const track = await getCameraTrack()
+                cameraTrack = track
+                const sender = pc.value.getSenders().find(s => s.track?.kind === 'video')
+                if (sender) {
+                    await sender.replaceTrack(track)
+                } else {
+                    pc.value.addTrack(track, localStream.value!)
+                    await renegotiate(pc.value, callId, peerId, socket)
+                }
+                isVideoOn.value = true
+                socket.emit('call:video-toggle', { callId, enabled: true })
+            } catch { /* user denied or no camera */ }
+        }
+    }
+
+    async function toggleScreenShare(socket: Socket) {
+        if (!pc.value || !callInfo.value) return
+        const { callId, peerId } = callInfo.value
+
+        if (isScreenSharing.value) {
+            const sender = pc.value.getSenders().find(s => s.track?.kind === 'video')
+            if (sender) await sender.replaceTrack(cameraTrack ?? null)
+            screenTrack?.stop(); screenTrack = null
+            isScreenSharing.value = false
+            isVideoOn.value = !!cameraTrack
+            socket.emit('call:share-screen', { callId, enabled: false })
+        } else {
+            try {
+                const track = await getScreenTrack()
+                screenTrack = track
+                // When user stops via browser UI
+                track.onended = () => toggleScreenShare(socket)
+                const sender = pc.value.getSenders().find(s => s.track?.kind === 'video')
+                if (sender) {
+                    await sender.replaceTrack(track)
+                } else {
+                    pc.value.addTrack(track, localStream.value!)
+                    await renegotiate(pc.value, callId, peerId, socket)
+                }
+                isScreenSharing.value = true
+                socket.emit('call:share-screen', { callId, enabled: true })
+            } catch { /* user cancelled screen picker */ }
+        }
+    }
+
     function endCall(socket: Socket) {
         if (callInfo.value) {
             socket.emit('call:end', { callId: callInfo.value.callId })
@@ -135,8 +203,9 @@ export const useCallStore = defineStore('call', () => {
     }
 
     return {
-        callState, callInfo, localStream, remoteStream, isMuted,
+        callState, callInfo, localStream, remoteStream, isMuted, isVideoOn, isScreenSharing,
         reset, onInitiated, onIncoming, onAccepted, acceptCall,
-        onSdpOffer, onSdpAnswer, onIceCandidate, toggleMute, endCall, rejectCall,
+        onSdpOffer, onSdpAnswer, onIceCandidate,
+        toggleMute, toggleCamera, toggleScreenShare, endCall, rejectCall,
     }
 })
