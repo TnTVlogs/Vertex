@@ -1,10 +1,10 @@
 import * as mediasoup from 'mediasoup'
 import logger from '../utils/logger'
 
-const CODECS: mediasoup.types.RtpCodecCapability[] = [
-    { kind: 'audio', mimeType: 'audio/opus', clockRate: 48000, channels: 2 },
-    { kind: 'video', mimeType: 'video/VP8', clockRate: 90000 },
-]
+const CODECS = [
+    { kind: 'audio' as const, mimeType: 'audio/opus', clockRate: 48000, channels: 2 },
+    { kind: 'video' as const, mimeType: 'video/VP8', clockRate: 90000 },
+] as mediasoup.types.RtpCodecCapability[]
 
 function transportOptions(): mediasoup.types.WebRtcTransportOptions {
     return {
