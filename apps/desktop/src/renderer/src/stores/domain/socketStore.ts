@@ -128,6 +128,9 @@ export const useSocketStore = defineStore('socket', {
                 this.socket.on('channel:peer-joined', (data: any) => {
                     useVoiceChannelStore().handlePeerJoined(data)
                 })
+                this.socket.on('channel:speaking', (data: any) => {
+                    useVoiceChannelStore().handleSpeaking(data)
+                })
             }
         },
 

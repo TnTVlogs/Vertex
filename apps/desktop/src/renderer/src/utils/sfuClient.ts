@@ -1,6 +1,8 @@
-import { Device } from 'mediasoup-client'
-import type { RtpCapabilities, RtpParameters, DtlsParameters, MediaKind } from 'mediasoup-client/lib/types'
+import { Device, types as mediasoupTypes } from 'mediasoup-client'
 import type { Socket } from 'socket.io-client'
+
+type RtpCapabilities = mediasoupTypes.RtpCapabilities
+type RtpParameters = mediasoupTypes.RtpParameters
 
 export interface TransportParams {
     id: string

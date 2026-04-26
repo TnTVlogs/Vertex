@@ -120,6 +120,22 @@ export function registerChannelCallHandler(io: Server, socket: Socket) {
         handleLeave(channelId)
     })
 
+    // ── channel:speaking ──────────────────────────────────────────────────────
+    socket.on('channel:speaking', (data: { channelId: string; speaking: boolean }) => {
+        if (!data.channelId) return
+        socket.to(`voice:${data.channelId}`).emit('channel:speaking', {
+            channelId: data.channelId, userId, speaking: data.speaking,
+        })
+    })
+
+    // ── channel:video-on ──────────────────────────────────────────────────────
+    socket.on('channel:video-on', (data: { channelId: string; enabled: boolean }) => {
+        if (!data.channelId) return
+        socket.to(`voice:${data.channelId}`).emit('channel:video-on', {
+            channelId: data.channelId, userId, enabled: data.enabled,
+        })
+    })
+
     // Auto-leave on socket disconnect
     socket.on('disconnecting', () => {
         const voiceRooms = [...socket.rooms].filter(r => r.startsWith('voice:'))
