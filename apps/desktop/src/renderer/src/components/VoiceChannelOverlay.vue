@@ -133,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useVoiceChannelStore } from '../stores/voiceChannelStore'
 import { useAuthStore } from '../stores/authStore'
 import { useSocketStore } from '../stores/domain/socketStore'
@@ -156,8 +156,8 @@ const friendStore = useFriendStore()
 
 const localVideoEl = ref<HTMLVideoElement | null>(null)
 
-watch(() => voiceStore.localVideoStream, (stream) => {
-    if (localVideoEl.value) localVideoEl.value.srcObject = stream
+watchEffect(() => {
+    if (localVideoEl.value) localVideoEl.value.srcObject = voiceStore.localVideoStream
 })
 
 const hasAnyVideo = computed(() => {
