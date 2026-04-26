@@ -11,6 +11,7 @@ import { Tier } from '../config/limits.config';
 import { getLimits } from '../services/tierService';
 import logger from '../utils/logger';
 import { registerCallHandler } from './callHandler';
+import { registerChannelCallHandler } from './channelCallHandler';
 
 const socketToUser = new Map<string, string>();
 const userToSockets = new Map<string, Set<string>>();
@@ -228,6 +229,9 @@ export const handleSocketConnections = (io: Server) => {
 
         // ── Call signaling ───────────────────────────────────────────────────
         registerCallHandler(io, socket, userToSockets);
+
+        // ── Channel voice (SFU) ──────────────────────────────────────────────
+        registerChannelCallHandler(io, socket);
 
         socket.on('typing', (data: { channelId?: string; recipientId?: string }) => {
             const userId = socket.data.userId as string;

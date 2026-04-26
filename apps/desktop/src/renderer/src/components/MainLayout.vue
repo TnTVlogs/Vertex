@@ -17,8 +17,11 @@ import FriendsView from '../components/FriendsView.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import IncomingCallModal from '../components/IncomingCallModal.vue'
 import CallOverlay from '../components/CallOverlay.vue'
+import VoiceChannelOverlay from '../components/VoiceChannelOverlay.vue'
 import { useSocketStore } from '../stores/domain/socketStore'
 import { useUnreadStore } from '../stores/unreadStore'
+import { useCallStore } from '../stores/callStore'
+import { useVoiceChannelStore } from '../stores/voiceChannelStore'
 
 const authStore = useAuthStore()
 const navStore = useNavigationStore()
@@ -29,6 +32,8 @@ const i18n = useI18nStore()
 const toastStore = useToastStore()
 const socketStore = useSocketStore()
 const unreadStore = useUnreadStore()
+const callStore = useCallStore()
+const voiceStore = useVoiceChannelStore()
 
 const friendsTab = ref<'online' | 'all' | 'pending'>('online')
 const showAddFriendModal = ref(false)
@@ -106,6 +111,12 @@ onMounted(async () => {
     chatStore.fetchRequests()
   ])
 })
+
+async function joinVoiceChannel(channelId: string) {
+  const socket = socketStore.getSocket()
+  if (!socket) return
+  await voiceStore.joinChannel(channelId, socket)
+}
 
 const handleLogout = () => {
   authStore.logout()
@@ -332,12 +343,31 @@ const onServerAction = async (value: string) => {
              </h3>
              <div class="space-y-1">
                <div v-for="channel in chatStore.channels" :key="channel.id"
-                    @click="openChannel(navStore.activeServerId!, channel.id)"
-                    class="flex items-center px-3 py-2 rounded-xl cursor-pointer transition-all duration-200"
-                    :class="navStore.activeChannelId === channel.id ? 'bg-[var(--v-accent)] text-[var(--v-bg-base)] font-bold shadow-[0_4px_15px_var(--v-accent-glow)]' : 'text-[var(--v-text-secondary)] hover:bg-white/5 hover:text-white'"
+                    class="flex items-center px-3 py-2 rounded-xl transition-all duration-200 group"
+                    :class="[
+                      channel.type === 'voice' ? 'cursor-default' : 'cursor-pointer',
+                      channel.type !== 'voice' && navStore.activeChannelId === channel.id ? 'bg-[var(--v-accent)] text-[var(--v-bg-base)] font-bold shadow-[0_4px_15px_var(--v-accent-glow)]' : '',
+                      channel.type !== 'voice' && navStore.activeChannelId !== channel.id ? 'text-[var(--v-text-secondary)] hover:bg-white/5 hover:text-white' : '',
+                      channel.type === 'voice' ? 'text-[var(--v-text-secondary)]' : '',
+                    ]"
+                    @click="channel.type !== 'voice' && openChannel(navStore.activeServerId!, channel.id)"
                >
-                 <span class="mr-2 opacity-50 font-mono">#</span>
-                 <span class="text-sm truncate">{{ channel.name }}</span>
+                 <!-- text channel icon -->
+                 <span v-if="channel.type !== 'voice'" class="mr-2 opacity-50 font-mono">#</span>
+                 <!-- voice channel icon -->
+                 <svg v-else viewBox="0 0 24 24" width="14" height="14" fill="currentColor" class="mr-2 opacity-50 shrink-0"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                 <span class="text-sm truncate flex-1">{{ channel.name }}</span>
+                 <!-- join button for voice channels -->
+                 <button
+                   v-if="channel.type === 'voice'"
+                   @click.stop="voiceStore.activeChannelId === channel.id ? voiceStore.leaveChannel(socketStore.getSocket()!) : joinVoiceChannel(channel.id)"
+                   :disabled="voiceStore.isConnecting"
+                   class="ml-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all disabled:cursor-wait"
+                   :class="voiceStore.activeChannelId === channel.id ? 'bg-red-500/20 text-red-400' : 'bg-[var(--v-accent)]/20 text-[var(--v-accent)] hover:bg-[var(--v-accent)]/40'"
+                 >
+                   {{ voiceStore.activeChannelId === channel.id ? 'Leave' : 'Join' }}
+                 </button>
+                 <div v-if="channel.type === 'voice' && voiceStore.activeChannelId === channel.id" class="w-1.5 h-1.5 rounded-full bg-[var(--v-accent)] animate-pulse ml-1 shrink-0"></div>
                </div>
              </div>
            </section>
@@ -416,11 +446,13 @@ const onServerAction = async (value: string) => {
             </h2>
           </div>
           <div class="flex items-center space-x-2 md:space-x-4 shrink-0">
-             <!-- Voice call button (DM only) -->
+             <!-- Voice call button (DM only, disabled during active call) -->
              <button
                v-if="navStore.activeRecipientId && !navStore.activeChannelId"
                @click="socketStore.initiateCall(navStore.activeRecipientId, 'audio')"
-               class="text-[var(--v-text-secondary)] hover:text-[var(--v-accent)] transition-colors p-1"
+               :disabled="callStore.callState !== 'idle'"
+               class="transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed"
+               :class="callStore.callState === 'idle' ? 'text-[var(--v-text-secondary)] hover:text-[var(--v-accent)]' : 'text-[var(--v-text-secondary)]'"
                title="Voice call"
              >
                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
@@ -520,6 +552,7 @@ const onServerAction = async (value: string) => {
 
     <IncomingCallModal />
     <CallOverlay />
+    <VoiceChannelOverlay />
   </div>
 </template>
 

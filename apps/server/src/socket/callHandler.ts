@@ -55,6 +55,12 @@ export function registerCallHandler(
 
         if (targetUserId === userId) return socketError('Cannot call yourself');
 
+        const existingCall = await callService.getByUserId(userId);
+        if (existingCall && existingCall.state !== 'ended') return socketError('Already in a call');
+
+        const calleeCall = await callService.getByUserId(targetUserId);
+        if (calleeCall && calleeCall.state !== 'ended') return socketError('User is already in a call');
+
         const friends = await socialService.areFriends(userId, targetUserId);
         if (!friends) return socketError('No active friendship with target user');
 

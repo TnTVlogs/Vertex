@@ -40,8 +40,9 @@ export const authController = {
                 message: 'Compte creat. Espera l\'aprovació de l\'administrador per poder iniciar sessió.'
             });
         } catch (error: any) {
-            if (error.code === 'ER_DUP_ENTRY') {
-                return res.status(400).json({ error: 'User already exists (email or username taken)' });
+            if (error.code === 'ER_DUP_ENTRY' || error.code === 'P2002') {
+                const field = error.meta?.constraint?.index?.includes('email') ? 'email' : 'username'
+                return res.status(409).json({ error: `Aquest ${field} ja està registrat.` });
             }
             logger.error({ err: error }, 'register error');
             res.status(500).json({ error: 'Internal server error' });

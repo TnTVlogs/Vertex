@@ -184,6 +184,16 @@ app.whenReady().then(() => {
         optimizer.watchWindowShortcuts(window)
     })
 
+    // Grant microphone, camera and screen capture permissions to the renderer
+    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+        const allowed = ['media', 'mediaKeySystem', 'display-capture']
+        callback(allowed.includes(permission))
+    })
+    session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+        const allowed = ['media', 'mediaKeySystem', 'display-capture']
+        return allowed.includes(permission)
+    })
+
     // Spoof Origin so server-side CORS/WS origin checks accept requests from file:// (packaged)
     // and localhost (dev). Server checks Origin header — Electron sends file:// which fails.
     session.defaultSession.webRequest.onBeforeSendHeaders(

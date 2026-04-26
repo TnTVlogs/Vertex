@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../authStore';
 import { useCallStore } from '../callStore';
+import { useVoiceChannelStore } from '../voiceChannelStore';
 import { Message } from '@shared/models';
 import { ENV } from '../../utils/env';
 import { notificationService } from '../../services/notificationService';
@@ -113,6 +114,20 @@ export const useSocketStore = defineStore('socket', {
                     const callStore = useCallStore()
                     await callStore.onIceCandidate(data.candidate)
                 })
+
+                // ── Voice channel events ─────────────────────────────────────
+                this.socket.on('channel:new-producer', (data: any) => {
+                    useVoiceChannelStore().handleNewProducer(data, socket)
+                })
+                this.socket.on('channel:producer-closed', (data: any) => {
+                    useVoiceChannelStore().handleProducerClosed(data)
+                })
+                this.socket.on('channel:peer-left', (data: any) => {
+                    useVoiceChannelStore().handlePeerLeft(data)
+                })
+                this.socket.on('channel:peer-joined', (data: any) => {
+                    useVoiceChannelStore().handlePeerJoined(data)
+                })
             }
         },
 
@@ -121,6 +136,8 @@ export const useSocketStore = defineStore('socket', {
         },
 
         initiateCall(targetUserId: string, callType: 'audio' | 'video') {
+            const callStore = useCallStore()
+            if (callStore.callState !== 'idle') return
             this.socket?.emit('call:initiate', { targetUserId, callType })
         },
 

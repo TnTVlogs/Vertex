@@ -1,0 +1,148 @@
+import { Server, Socket } from 'socket.io'
+import { z } from 'zod'
+import { sfuService } from '../services/sfuService'
+import { serverService } from '../services/serverService'
+import logger from '../utils/logger'
+
+const joinSchema = z.object({ channelId: z.string().uuid() })
+const connectSchema = z.object({
+    channelId: z.string().uuid(),
+    transportId: z.string(),
+    dtlsParameters: z.record(z.string(), z.unknown()),
+})
+const produceSchema = z.object({
+    channelId: z.string().uuid(),
+    kind: z.enum(['audio', 'video']),
+    rtpParameters: z.record(z.string(), z.unknown()),
+})
+const consumeSchema = z.object({
+    channelId: z.string().uuid(),
+    producerId: z.string(),
+    rtpCapabilities: z.record(z.string(), z.unknown()),
+})
+const resumeSchema = z.object({ channelId: z.string().uuid(), consumerId: z.string() })
+const leaveSchema = z.object({ channelId: z.string().uuid() })
+
+export function registerChannelCallHandler(io: Server, socket: Socket) {
+    const userId = socket.data.userId as string
+
+    function err(msg: string) { socket.emit('channel:error', { message: msg }) }
+
+    // ── channel:join-voice ─────────────────────────────────────────────────────
+    socket.on('channel:join-voice', async (data: unknown) => {
+        const parsed = joinSchema.safeParse(data)
+        if (!parsed.success) return err('Invalid payload')
+        const { channelId } = parsed.data
+
+        const isMember = await serverService.isUserMemberOfChannel(userId, channelId)
+        if (!isMember) return err('Not a member of this channel')
+
+        try {
+            const result = await sfuService.joinRoom(channelId, userId)
+            socket.join(`voice:${channelId}`)
+
+            // Tell the joiner the room state
+            socket.emit('channel:joined', { channelId, ...result })
+
+            // Tell others a new peer arrived
+            socket.to(`voice:${channelId}`).emit('channel:peer-joined', {
+                channelId, peerId: userId,
+            })
+
+            logger.info({ userId, channelId }, 'channel:join-voice')
+        } catch (e: any) {
+            logger.error({ err: e }, 'channel:join-voice failed')
+            err('Failed to join voice channel')
+        }
+    })
+
+    // ── channel:transport-connect ──────────────────────────────────────────────
+    socket.on('channel:transport-connect', async (data: unknown) => {
+        const parsed = connectSchema.safeParse(data)
+        if (!parsed.success) return err('Invalid payload')
+        const { channelId, transportId, dtlsParameters } = parsed.data
+
+        await sfuService.connectTransport(
+            channelId, userId, transportId,
+            dtlsParameters as any,
+        )
+    })
+
+    // ── channel:produce ────────────────────────────────────────────────────────
+    socket.on('channel:produce', async (data: unknown, callback: (res: any) => void) => {
+        const parsed = produceSchema.safeParse(data)
+        if (!parsed.success) return callback?.({ error: 'Invalid payload' })
+        const { channelId, kind, rtpParameters } = parsed.data
+
+        try {
+            const producerId = await sfuService.produce(
+                channelId, userId, kind as any, rtpParameters as any,
+            )
+            callback?.({ producerId })
+
+            // Notify others so they can consume
+            socket.to(`voice:${channelId}`).emit('channel:new-producer', {
+                channelId, producerId, peerId: userId, kind,
+            })
+        } catch (e: any) {
+            callback?.({ error: e.message })
+        }
+    })
+
+    // ── channel:consume ────────────────────────────────────────────────────────
+    socket.on('channel:consume', async (data: unknown, callback: (res: any) => void) => {
+        const parsed = consumeSchema.safeParse(data)
+        if (!parsed.success) return callback?.({ error: 'Invalid payload' })
+        const { channelId, producerId, rtpCapabilities } = parsed.data
+
+        try {
+            const params = await sfuService.consume(
+                channelId, userId, producerId, rtpCapabilities as any,
+            )
+            callback?.({ ...params })
+        } catch (e: any) {
+            callback?.({ error: e.message })
+        }
+    })
+
+    // ── channel:resume-consumer ────────────────────────────────────────────────
+    socket.on('channel:resume-consumer', async (data: unknown) => {
+        const parsed = resumeSchema.safeParse(data)
+        if (!parsed.success) return
+        await sfuService.resumeConsumer(parsed.data.channelId, userId, parsed.data.consumerId)
+    })
+
+    // ── channel:leave-voice ────────────────────────────────────────────────────
+    socket.on('channel:leave-voice', (data: unknown) => {
+        const parsed = leaveSchema.safeParse(data)
+        if (!parsed.success) return
+        const { channelId } = parsed.data
+        handleLeave(channelId)
+    })
+
+    // Auto-leave on socket disconnect
+    socket.on('disconnecting', () => {
+        const voiceRooms = [...socket.rooms].filter(r => r.startsWith('voice:'))
+        for (const room of voiceRooms) {
+            const channelId = room.replace('voice:', '')
+            handleLeave(channelId)
+        }
+    })
+
+    function handleLeave(channelId: string) {
+        const closedProducerIds = sfuService.leaveRoom(channelId, userId)
+        socket.leave(`voice:${channelId}`)
+
+        if (closedProducerIds.length > 0) {
+            io.to(`voice:${channelId}`).emit('channel:producer-closed', {
+                channelId, peerId: userId, producerIds: closedProducerIds,
+            })
+        }
+
+        io.to(`voice:${channelId}`).emit('channel:peer-left', {
+            channelId, peerId: userId,
+        })
+
+        logger.info({ userId, channelId }, 'channel:leave-voice')
+    }
+}
