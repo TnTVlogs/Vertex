@@ -25,7 +25,7 @@ export async function createSendTransport(
     socket: Socket,
 ) {
     const transport = device.createSendTransport(params as any)
-    console.log('[SFU] SendTransport created, iceCandidates:', (params.iceCandidates as any[]).map((c: any) => c.address ?? c.ip))
+    console.log('[SFU] SendTransport created, iceCandidates:', (params.iceCandidates as any[]).map((c: any) => `${c.address ?? c.ip}:${c.port} (${c.protocol})`))
 
     transport.on('connectionstatechange', (state) => {
         console.log('[SFU] SendTransport connectionstate:', state)
@@ -62,7 +62,7 @@ export async function createRecvTransport(
     socket: Socket,
 ) {
     const transport = device.createRecvTransport(params as any)
-    console.log('[SFU] RecvTransport created, iceCandidates:', (params.iceCandidates as any[]).map((c: any) => c.address ?? c.ip))
+    console.log('[SFU] RecvTransport created, iceCandidates:', (params.iceCandidates as any[]).map((c: any) => `${c.address ?? c.ip}:${c.port} (${c.protocol})`))
 
     transport.on('connectionstatechange', (state) => {
         console.log('[SFU] RecvTransport connectionstate:', state)
