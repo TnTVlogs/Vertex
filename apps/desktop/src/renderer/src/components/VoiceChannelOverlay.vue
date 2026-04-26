@@ -40,7 +40,7 @@
             class="relative rounded-xl overflow-hidden bg-zinc-900 aspect-video transition-all"
             :class="voiceStore.speakingUsers.has(peerId) ? 'ring-2 ring-[var(--v-accent)]' : 'ring-1 ring-white/10'"
           >
-            <video autoplay playsinline :srcObject="(peer.stream as any)" class="w-full h-full object-cover" />
+            <video autoplay playsinline v-src-object="peer.stream" class="w-full h-full object-cover" />
             <div class="absolute bottom-1 left-1.5">
               <span class="text-[8px] font-black text-white bg-black/70 px-1.5 py-0.5 rounded-md">
                 {{ resolveName(peerId) }}
@@ -71,7 +71,7 @@
 
         <!-- Remote peers -->
         <div v-for="[peerId, peer] in voiceStore.peers" :key="peerId" class="flex items-center space-x-2">
-          <audio autoplay :srcObject="(peer.stream as any) ?? undefined" />
+          <audio autoplay v-src-object="peer.stream" />
           <div
             class="w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black shrink-0 transition-all"
             :class="voiceStore.speakingUsers.has(peerId) ? 'bg-white/20 ring-1 ring-[var(--v-accent)]' : 'bg-white/10'"
@@ -138,6 +138,16 @@ import { useVoiceChannelStore } from '../stores/voiceChannelStore'
 import { useAuthStore } from '../stores/authStore'
 import { useSocketStore } from '../stores/domain/socketStore'
 import { useFriendStore } from '../stores/domain/friendStore'
+
+// Vue doesn't reliably set srcObject as a DOM property via :srcObject binding
+const vSrcObject = {
+    mounted(el: HTMLMediaElement, { value }: { value: MediaStream | null }) {
+        el.srcObject = value ?? null
+    },
+    updated(el: HTMLMediaElement, { value }: { value: MediaStream | null }) {
+        if (el.srcObject !== value) el.srcObject = value ?? null
+    },
+}
 
 const voiceStore = useVoiceChannelStore()
 const authStore = useAuthStore()
