@@ -260,9 +260,9 @@ function stopDrag() {
     else if (cx < midX && cy >= midY) c = 'bottom-left'
     else                               c = 'bottom-right'
     corner.value = c
-    el.style.transition = 'top 0.25s cubic-bezier(0.34,1.56,0.64,1), left 0.25s cubic-bezier(0.34,1.56,0.64,1)'
+    el.style.transition = 'top 0.5s cubic-bezier(0.34,1.56,0.64,1), left 0.5s cubic-bezier(0.34,1.56,0.64,1)'
     applyCorner(el, c)
-    setTimeout(() => { if (overlayRef.value) overlayRef.value.style.transition = '' }, 280)
+    setTimeout(() => { if (overlayRef.value) overlayRef.value.style.transition = '' }, 550)
 }
 
 onUnmounted(() => {

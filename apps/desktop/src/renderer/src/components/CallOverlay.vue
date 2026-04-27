@@ -308,9 +308,9 @@ function stopDrag() {
 
     const el = overlayRef.value
     if (el) {
-        el.style.transition = 'top 0.25s cubic-bezier(0.34,1.56,0.64,1), left 0.25s cubic-bezier(0.34,1.56,0.64,1)'
+        el.style.transition = 'top 0.5s cubic-bezier(0.34,1.56,0.64,1), left 0.5s cubic-bezier(0.34,1.56,0.64,1)'
         applyCorner(el, newCorner)
-        setTimeout(() => { if (overlayRef.value) overlayRef.value.style.transition = '' }, 280)
+        setTimeout(() => { if (overlayRef.value) overlayRef.value.style.transition = '' }, 550)
     }
     corner.value = newCorner
 }
