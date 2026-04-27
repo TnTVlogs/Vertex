@@ -214,19 +214,34 @@ let dragOffsetX = 0
 let dragOffsetY = 0
 let lastX = 0
 let lastY = 0
-const OVERLAY_W = 288  // w-72 = 18rem
 const PAD = 24
 
+// Always use top+left so CSS can animate between corners without teleporting.
+// bottom/right and top/left are different CSS properties — transitions between them jump.
 function applyCorner(el: HTMLElement, c: Corner) {
-    el.style.top = ''
-    el.style.left = ''
+    const W = el.offsetWidth
+    const H = el.offsetHeight
+    const vw = window.innerWidth
+    const vh = window.innerHeight
     el.style.bottom = ''
     el.style.right = ''
     switch (c) {
-        case 'top-left':     el.style.top = `${PAD}px`;    el.style.left = `${PAD}px`; break
-        case 'top-right':    el.style.top = `${PAD}px`;    el.style.right = `${PAD}px`; break
-        case 'bottom-left':  el.style.bottom = `${PAD}px`; el.style.left = `${PAD}px`; break
-        case 'bottom-right': el.style.bottom = `${PAD}px`; el.style.right = `${PAD}px`; break
+        case 'top-left':
+            el.style.top  = `${PAD}px`
+            el.style.left = `${PAD}px`
+            break
+        case 'top-right':
+            el.style.top  = `${PAD}px`
+            el.style.left = `${vw - W - PAD}px`
+            break
+        case 'bottom-left':
+            el.style.top  = `${vh - H - PAD}px`
+            el.style.left = `${PAD}px`
+            break
+        case 'bottom-right':
+            el.style.top  = `${vh - H - PAD}px`
+            el.style.left = `${vw - W - PAD}px`
+            break
     }
 }
 
@@ -293,10 +308,9 @@ function stopDrag() {
 
     const el = overlayRef.value
     if (el) {
-        el.style.transition = 'all 0.2s ease'
+        el.style.transition = 'top 0.25s cubic-bezier(0.34,1.56,0.64,1), left 0.25s cubic-bezier(0.34,1.56,0.64,1)'
         applyCorner(el, newCorner)
-        // Clear transition after animation
-        setTimeout(() => { if (overlayRef.value) overlayRef.value.style.transition = '' }, 220)
+        setTimeout(() => { if (overlayRef.value) overlayRef.value.style.transition = '' }, 280)
     }
     corner.value = newCorner
 }

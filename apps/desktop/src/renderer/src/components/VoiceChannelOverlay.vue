@@ -195,12 +195,21 @@ let dragOffsetX = 0, dragOffsetY = 0, lastX = 0, lastY = 0
 const PAD = 24
 
 function applyCorner(el: HTMLElement, c: Corner) {
-    el.style.top = ''; el.style.left = ''; el.style.bottom = ''; el.style.right = ''
+    const W = el.offsetWidth
+    const H = el.offsetHeight
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    el.style.bottom = ''
+    el.style.right = ''
     switch (c) {
-        case 'top-left':     el.style.top = `${PAD}px`;    el.style.left = `${PAD}px`; break
-        case 'top-right':    el.style.top = `${PAD}px`;    el.style.right = `${PAD}px`; break
-        case 'bottom-left':  el.style.bottom = `${PAD}px`; el.style.left = `${PAD}px`; break
-        case 'bottom-right': el.style.bottom = `${PAD}px`; el.style.right = `${PAD}px`; break
+        case 'top-left':
+            el.style.top  = `${PAD}px`;          el.style.left = `${PAD}px`; break
+        case 'top-right':
+            el.style.top  = `${PAD}px`;          el.style.left = `${vw - W - PAD}px`; break
+        case 'bottom-left':
+            el.style.top  = `${vh - H - PAD}px`; el.style.left = `${PAD}px`; break
+        case 'bottom-right':
+            el.style.top  = `${vh - H - PAD}px`; el.style.left = `${vw - W - PAD}px`; break
     }
 }
 
@@ -251,9 +260,9 @@ function stopDrag() {
     else if (cx < midX && cy >= midY) c = 'bottom-left'
     else                               c = 'bottom-right'
     corner.value = c
-    el.style.transition = 'all 0.2s ease'
+    el.style.transition = 'top 0.25s cubic-bezier(0.34,1.56,0.64,1), left 0.25s cubic-bezier(0.34,1.56,0.64,1)'
     applyCorner(el, c)
-    setTimeout(() => { if (overlayRef.value) overlayRef.value.style.transition = '' }, 220)
+    setTimeout(() => { if (overlayRef.value) overlayRef.value.style.transition = '' }, 280)
 }
 
 onUnmounted(() => {
