@@ -5,23 +5,25 @@ import ToastContainer from './components/ToastContainer.vue'
 import { useAuthStore } from './stores/authStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useCallStore } from './stores/callStore'
+import { useVoiceChannelStore } from './stores/voiceChannelStore'
 import { onMounted, onUnmounted, ref } from 'vue'
 
 useSettingsStore()
 
 const authStore = useAuthStore()
 const callStore = useCallStore()
+const voiceStore = useVoiceChannelStore()
 const ready = ref(false)
 
 const urlParams = new URLSearchParams(window.location.search)
 const isSplash = ref(urlParams.get('splash') === 'true')
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
-  const s = callStore.callState
-  if (s === 'idle' || s === 'ended') return
+  const callActive = callStore.callState !== 'idle' && callStore.callState !== 'ended'
+  const voiceActive = !!voiceStore.activeChannelId
+  if (!callActive && !voiceActive) return
   e.preventDefault()
-  // Modern browsers ignore custom message but need a non-empty string
-  e.returnValue = 'You are in a call — leaving will end it.'
+  e.returnValue = ''  // non-empty string required in older browsers; modern ones ignore the text
   return e.returnValue
 }
 

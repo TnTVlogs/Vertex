@@ -64,6 +64,22 @@ export function registerChannelCallHandler(io: Server, socket: Socket) {
                 channelId, peerId: userId,
             })
 
+            // Send voice members directly to the joiner (they may not be in the server room yet)
+            const serverId = await serverService.getChannelServerId(channelId)
+            if (serverId) {
+                const peerIds = sfuService.getRoomPeerIds(channelId)
+                const users = await prisma.user.findMany({
+                    where: { id: { in: peerIds } },
+                    select: { id: true, username: true },
+                })
+                socket.emit('channel:voice-members', {
+                    channelId,
+                    members: users.map(u => ({ userId: u.id, username: u.username })),
+                })
+                // Also join the server room if not already in it, so future updates arrive
+                socket.join(`server:${serverId}`)
+            }
+
             broadcastVoiceMembers(channelId)
             logger.info({ userId, channelId }, 'channel:join-voice')
         } catch (e: any) {

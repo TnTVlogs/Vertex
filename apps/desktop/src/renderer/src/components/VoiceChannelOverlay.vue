@@ -2,11 +2,12 @@
   <Teleport to="body">
     <div
       v-if="voiceStore.activeChannelId"
-      class="fixed bottom-6 left-6 z-[198] bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col"
+      ref="overlayRef"
+      class="fixed z-[198] bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col select-none"
       :class="hasAnyVideo ? 'w-96' : 'w-56'"
     >
-      <!-- Header -->
-      <div class="px-4 py-2.5 border-b border-[var(--v-border)] flex items-center justify-between shrink-0">
+      <!-- Header (drag handle) -->
+      <div class="px-4 py-2.5 border-b border-[var(--v-border)] flex items-center justify-between shrink-0 cursor-grab active:cursor-grabbing" @mousedown="startDrag">
         <div class="flex items-center space-x-2">
           <div class="w-2 h-2 rounded-full bg-[var(--v-accent)] animate-pulse"></div>
           <span class="text-xs font-black text-white uppercase tracking-wider">Voice</span>
@@ -160,7 +161,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref, watch, watchEffect, onUnmounted, nextTick } from 'vue'
 import { useVoiceChannelStore } from '../stores/voiceChannelStore'
 import { useAuthStore } from '../stores/authStore'
 import { useSocketStore } from '../stores/domain/socketStore'
@@ -184,6 +185,81 @@ const friendStore = useFriendStore()
 
 const localVideoEl = ref<HTMLVideoElement | null>(null)
 const showQuality = ref(false)
+
+// ── Drag & corner snap ────────────────────────────────────────────────────────
+type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+const overlayRef = ref<HTMLElement | null>(null)
+const corner = ref<Corner>('bottom-left')
+let isDragging = false
+let dragOffsetX = 0, dragOffsetY = 0, lastX = 0, lastY = 0
+const PAD = 24
+
+function applyCorner(el: HTMLElement, c: Corner) {
+    el.style.top = ''; el.style.left = ''; el.style.bottom = ''; el.style.right = ''
+    switch (c) {
+        case 'top-left':     el.style.top = `${PAD}px`;    el.style.left = `${PAD}px`; break
+        case 'top-right':    el.style.top = `${PAD}px`;    el.style.right = `${PAD}px`; break
+        case 'bottom-left':  el.style.bottom = `${PAD}px`; el.style.left = `${PAD}px`; break
+        case 'bottom-right': el.style.bottom = `${PAD}px`; el.style.right = `${PAD}px`; break
+    }
+}
+
+watch([() => voiceStore.activeChannelId, overlayRef], async ([active]) => {
+    if (!active) return
+    await nextTick()
+    if (overlayRef.value) applyCorner(overlayRef.value, corner.value)
+}, { immediate: true })
+
+function startDrag(e: MouseEvent) {
+    if ((e.target as HTMLElement).closest('button')) return
+    const el = overlayRef.value
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    dragOffsetX = e.clientX - rect.left
+    dragOffsetY = e.clientY - rect.top
+    lastX = rect.left; lastY = rect.top
+    el.style.transition = 'none'
+    el.style.bottom = ''; el.style.right = ''
+    el.style.top = `${rect.top}px`; el.style.left = `${rect.left}px`
+    isDragging = true
+    window.addEventListener('mousemove', onDrag)
+    window.addEventListener('mouseup', stopDrag)
+    e.preventDefault()
+}
+
+function onDrag(e: MouseEvent) {
+    if (!isDragging) return
+    const el = overlayRef.value
+    if (!el) return
+    lastX = e.clientX - dragOffsetX; lastY = e.clientY - dragOffsetY
+    el.style.left = `${lastX}px`; el.style.top = `${lastY}px`
+}
+
+function stopDrag() {
+    if (!isDragging) return
+    isDragging = false
+    window.removeEventListener('mousemove', onDrag)
+    window.removeEventListener('mouseup', stopDrag)
+    const el = overlayRef.value
+    if (!el) return
+    const W = el.offsetWidth
+    const cx = lastX + W / 2, cy = lastY
+    const midX = window.innerWidth / 2, midY = window.innerHeight / 2
+    let c: Corner
+    if (cx < midX && cy < midY)       c = 'top-left'
+    else if (cx >= midX && cy < midY) c = 'top-right'
+    else if (cx < midX && cy >= midY) c = 'bottom-left'
+    else                               c = 'bottom-right'
+    corner.value = c
+    el.style.transition = 'all 0.2s ease'
+    applyCorner(el, c)
+    setTimeout(() => { if (overlayRef.value) overlayRef.value.style.transition = '' }, 220)
+}
+
+onUnmounted(() => {
+    window.removeEventListener('mousemove', onDrag)
+    window.removeEventListener('mouseup', stopDrag)
+})
 
 watchEffect(() => {
     if (localVideoEl.value) localVideoEl.value.srcObject = voiceStore.localVideoStream
