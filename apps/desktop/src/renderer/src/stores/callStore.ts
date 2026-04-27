@@ -108,6 +108,7 @@ export const useCallStore = defineStore('call', () => {
         if (callState.value !== 'idle') return // already in a call
         callInfo.value = { callId, callType, peerId: callerId, peerName: callerName }
         callState.value = 'ringing-in'
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify({ callId, callType, peerId: callerId, peerName: callerName, ts: Date.now() }))
     }
 
     async function makePC(callId: string, peerId: string, socket: Socket): Promise<RTCPeerConnection> {

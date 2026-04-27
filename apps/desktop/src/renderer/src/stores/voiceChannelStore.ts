@@ -9,6 +9,7 @@ import {
     consumeProducer,
     type TransportParams,
 } from '../utils/sfuClient'
+import { type CallQuality, VIDEO_CONSTRAINTS } from '../utils/webrtc'
 
 export interface VoicePeer {
     peerId: string
@@ -27,6 +28,7 @@ export const useVoiceChannelStore = defineStore('voiceChannel', () => {
     const isConnecting = ref(false)
     const isSpeaking = ref(false)
     const speakingUsers = ref<Set<string>>(new Set())
+    const videoQuality = ref<CallQuality>('medium')
     // Maps channelId → list of members currently in that voice channel
     const voiceChannelMembers = ref<Map<string, { userId: string; username: string }[]>>(new Map())
 
@@ -42,9 +44,22 @@ export const useVoiceChannelStore = defineStore('voiceChannel', () => {
     let analyserNode: AnalyserNode | null = null
     let speakingTimer: ReturnType<typeof setInterval> | null = null
 
+    const VOICE_SESSION_KEY = 'vertex:voice-channel'
+
+    function getInterruptedVoiceChannel(): string | null {
+        try {
+            const raw = sessionStorage.getItem(VOICE_SESSION_KEY)
+            if (!raw) return null
+            const { channelId, ts } = JSON.parse(raw)
+            if (Date.now() - ts > 30_000) { sessionStorage.removeItem(VOICE_SESSION_KEY); return null }
+            return channelId as string
+        } catch { return null }
+    }
+
     async function joinChannel(channelId: string, socket: Socket) {
         if (activeChannelId.value === channelId) return
         if (activeChannelId.value) await leaveChannel(socket)
+        sessionStorage.setItem(VOICE_SESSION_KEY, JSON.stringify({ channelId, ts: Date.now() }))
 
         isConnecting.value = true
         try {
@@ -142,6 +157,18 @@ export const useVoiceChannelStore = defineStore('voiceChannel', () => {
     function handleVoiceMembers(data: { channelId: string; members: { userId: string; username: string }[] }) {
         voiceChannelMembers.value.set(data.channelId, data.members)
         voiceChannelMembers.value = new Map(voiceChannelMembers.value)
+    }
+
+    async function setVideoQuality(quality: CallQuality) {
+        videoQuality.value = quality
+        if (!isVideoOn.value || !videoProducer) return
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS[quality], audio: false })
+            const newTrack = stream.getVideoTracks()[0]
+            await videoProducer.replaceTrack({ track: newTrack })
+            localVideoStream.value?.getTracks().forEach(t => t.stop())
+            localVideoStream.value = stream
+        } catch {}
     }
 
     function toggleMute() {
@@ -259,7 +286,7 @@ export const useVoiceChannelStore = defineStore('voiceChannel', () => {
     async function leaveChannel(socket: Socket) {
         if (!activeChannelId.value) return
         const channelId = activeChannelId.value
-
+        sessionStorage.removeItem(VOICE_SESSION_KEY)
         socket.emit('channel:leave-voice', { channelId })
 
         stopSpeakingDetection()
@@ -290,8 +317,9 @@ export const useVoiceChannelStore = defineStore('voiceChannel', () => {
 
     return {
         activeChannelId, peers, localStream, localVideoStream,
-        isMuted, isVideoOn, isScreenSharing, isConnecting, isSpeaking, speakingUsers, voiceChannelMembers,
-        joinChannel, leaveChannel, toggleMute, toggleCamera, toggleScreenShare,
+        isMuted, isVideoOn, isScreenSharing, isConnecting, isSpeaking, speakingUsers, voiceChannelMembers, videoQuality,
+        joinChannel, leaveChannel, toggleMute, toggleCamera, toggleScreenShare, setVideoQuality,
         handleNewProducer, handleProducerClosed, handlePeerLeft, handlePeerJoined, handleSpeaking, handleVoiceMembers,
+        getInterruptedVoiceChannel,
     }
 })

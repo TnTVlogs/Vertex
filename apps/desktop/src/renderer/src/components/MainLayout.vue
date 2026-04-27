@@ -105,7 +105,18 @@ async function handleServerClick(serverId: string) {
 
 onMounted(async () => {
   chatStore.connect()
-  
+
+  // Reconnect interrupted voice channel (reload within 30s)
+  const interruptedChannel = voiceStore.getInterruptedVoiceChannel()
+  if (interruptedChannel) {
+    const socket = socketStore.getSocket()
+    if (socket) {
+      const tryRejoin = () => joinVoiceChannel(interruptedChannel)
+      if (socket.connected) tryRejoin()
+      else socket.once('connect', tryRejoin)
+    }
+  }
+
   await Promise.all([
     chatStore.fetchFriends(),
     chatStore.fetchServers(),

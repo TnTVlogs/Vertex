@@ -77,7 +77,7 @@ export async function getAudioStream(quality: CallQuality = 'medium'): Promise<M
 
 export type CallQuality = 'low' | 'medium' | 'high'
 
-const VIDEO_CONSTRAINTS: Record<CallQuality, MediaTrackConstraints> = {
+export const VIDEO_CONSTRAINTS: Record<CallQuality, MediaTrackConstraints> = {
     low:    { width: 320,  height: 240,  frameRate: 15 },
     medium: { width: 640,  height: 480,  frameRate: 30 },
     high:   { width: 1280, height: 720,  frameRate: 60 },

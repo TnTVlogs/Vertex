@@ -17,9 +17,11 @@ const urlParams = new URLSearchParams(window.location.search)
 const isSplash = ref(urlParams.get('splash') === 'true')
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
-  if (callStore.callState !== 'active' && callStore.callState !== 'connecting') return
+  const s = callStore.callState
+  if (s === 'idle' || s === 'ended') return
   e.preventDefault()
-  e.returnValue = 'You are currently in a call. If you reload, the call will end.'
+  // Modern browsers ignore custom message but need a non-empty string
+  e.returnValue = 'You are in a call — leaving will end it.'
   return e.returnValue
 }
 

@@ -118,6 +118,33 @@
           <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
         </button>
 
+        <!-- Quality selector -->
+        <div class="relative">
+          <button
+            @click.stop="showQuality = !showQuality"
+            title="Video quality"
+            class="w-8 h-8 rounded-xl flex items-center justify-center transition-all bg-white/5 text-[var(--v-text-secondary)] hover:text-white"
+            :class="voiceStore.isVideoOn ? 'opacity-100' : 'opacity-40 cursor-default'"
+          >
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M3 9h4V5H3v4zm0 8h4v-4H3v4zm0-4h4v-4H3v4zm8 4h4v-4h-4v4zm4-8v-4h-4v4h4zm4 8h4v-4h-4v4zm-8-8v-4H7v4h4zm4 8h4v-4h-4v4zm0-16v4h4V5h-4zm-4 4H7v4h4V9zM3 5v4h4V5H3zm0 8h4v-4H3v4zm0 4h4v-4H3v4zm8 0h4v-4h-4v4zm4 0h4v-4h-4v4z"/></svg>
+          </button>
+          <div
+            v-if="showQuality"
+            class="absolute bottom-9 left-0 bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl shadow-xl overflow-hidden z-10 w-28"
+          >
+            <button
+              v-for="q in (['low', 'medium', 'high'] as const)"
+              :key="q"
+              @click="setQuality(q); showQuality = false"
+              class="w-full px-3 py-1.5 text-left text-xs font-bold transition-all hover:bg-white/5 flex items-center space-x-2"
+              :class="voiceStore.videoQuality === q ? 'text-[var(--v-accent)]' : 'text-[var(--v-text-secondary)]'"
+            >
+              <span>{{ q === 'low' ? '🔵' : q === 'medium' ? '🟡' : '🟢' }}</span>
+              <span class="capitalize">{{ q }}</span>
+            </button>
+          </div>
+        </div>
+
         <div class="flex-1" />
 
         <!-- Leave -->
@@ -138,6 +165,7 @@ import { useVoiceChannelStore } from '../stores/voiceChannelStore'
 import { useAuthStore } from '../stores/authStore'
 import { useSocketStore } from '../stores/domain/socketStore'
 import { useFriendStore } from '../stores/domain/friendStore'
+import type { CallQuality } from '../utils/webrtc'
 
 // Vue doesn't reliably set srcObject as a DOM property via :srcObject binding
 const vSrcObject = {
@@ -155,6 +183,7 @@ const socketStore = useSocketStore()
 const friendStore = useFriendStore()
 
 const localVideoEl = ref<HTMLVideoElement | null>(null)
+const showQuality = ref(false)
 
 watchEffect(() => {
     if (localVideoEl.value) localVideoEl.value.srcObject = voiceStore.localVideoStream
@@ -191,5 +220,9 @@ async function toggleScreen() {
 async function leave() {
     const socket = socketStore.getSocket()
     if (socket) await voiceStore.leaveChannel(socket)
+}
+
+async function setQuality(q: CallQuality) {
+    await voiceStore.setVideoQuality(q)
 }
 </script>

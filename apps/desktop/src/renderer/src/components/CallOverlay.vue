@@ -1,8 +1,8 @@
 <template>
   <Teleport to="body">
-    <!-- Reconnect banner (shown when interrupted call detected) -->
+    <!-- Reconnect banner -->
     <div
-      v-if="interruptedCall"
+      v-if="interruptedCall && !visible"
       class="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[var(--v-bg-surface)] border border-[var(--v-accent)]/40 rounded-xl px-4 py-3 flex items-center space-x-3 shadow-xl"
     >
       <span class="text-xs font-bold text-[var(--v-accent)]">Call interrupted</span>
@@ -13,9 +13,8 @@
 
     <div
       v-if="visible"
-      :style="overlayStyle"
+      ref="overlayRef"
       class="fixed z-[199] w-72 bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-2xl shadow-2xl overflow-hidden select-none"
-      :class="{ 'transition-all duration-200': !isDragging }"
     >
       <!-- Audio elements (always hidden) -->
       <audio ref="localAudio" autoplay muted v-src-object="callStore.localStream ?? null" />
@@ -30,7 +29,6 @@
           class="w-full h-full object-contain"
           v-src-object="callStore.remoteStream ?? null"
         />
-        <!-- Local PiP preview -->
         <div v-if="callStore.isVideoOn" class="absolute bottom-2 right-2 w-20 aspect-video bg-black rounded-lg overflow-hidden border border-white/20">
           <video
             ref="localVideo"
@@ -46,9 +44,9 @@
       <!-- Header (drag handle) -->
       <div
         class="px-4 py-3 border-b border-[var(--v-border)] flex items-center justify-between cursor-grab active:cursor-grabbing"
-        @mousedown.prevent="startDrag"
+        @mousedown="startDrag"
       >
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-3 pointer-events-none">
           <div class="w-8 h-8 rounded-xl bg-[var(--v-accent)]/10 flex items-center justify-center text-xs font-black text-[var(--v-accent)]">
             {{ callStore.callInfo?.peerName?.charAt(0).toUpperCase() ?? '?' }}
           </div>
@@ -58,12 +56,10 @@
           </div>
         </div>
         <div class="flex items-center space-x-1">
-          <span v-if="callStore.callState === 'active'" class="text-xs font-mono text-[var(--v-text-secondary)] mr-1">{{ timer }}</span>
-          <!-- Minimize -->
+          <span v-if="callStore.callState === 'active'" class="text-xs font-mono text-[var(--v-text-secondary)] mr-1 pointer-events-none">{{ timer }}</span>
           <button
             @click.stop="isMinimized = !isMinimized"
             class="w-6 h-6 rounded-lg flex items-center justify-center text-[var(--v-text-secondary)] hover:bg-white/10 hover:text-white transition-all"
-            :title="isMinimized ? 'Expand' : 'Minimize'"
           >
             <svg v-if="!isMinimized" viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
             <svg v-else viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -71,15 +67,14 @@
         </div>
       </div>
 
-      <!-- Controls (hidden when minimized) -->
+      <!-- Controls -->
       <div v-if="!isMinimized" class="px-4 py-3 flex items-center justify-between">
         <div class="flex items-center space-x-2">
-          <!-- Mute mic -->
+          <!-- Mute -->
           <button
             @click="callStore.toggleMute()"
             class="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
             :class="callStore.isMuted ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-[var(--v-text-secondary)] hover:bg-white/10 hover:text-white'"
-            title="Toggle mute"
           >
             <svg v-if="!callStore.isMuted" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
             <svg v-else viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V20c0 .55.45 1 1 1s1-.45 1-1v-2.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>
@@ -91,7 +86,6 @@
             @click="toggleCamera"
             class="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
             :class="callStore.isVideoOn ? 'bg-[var(--v-accent)]/20 text-[var(--v-accent)]' : 'bg-white/5 text-[var(--v-text-secondary)] hover:bg-white/10 hover:text-white'"
-            title="Toggle camera"
           >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
           </button>
@@ -102,7 +96,6 @@
             @click="toggleScreen"
             class="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
             :class="callStore.isScreenSharing ? 'bg-[var(--v-accent)]/20 text-[var(--v-accent)]' : 'bg-white/5 text-[var(--v-text-secondary)] hover:bg-white/10 hover:text-white'"
-            title="Share screen"
           >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h3l-1 1v1h12v-1l-1-1h3c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13H4V5h16v11z"/></svg>
           </button>
@@ -114,20 +107,22 @@
               class="w-9 h-9 rounded-xl flex items-center justify-center transition-all bg-white/5 text-[var(--v-text-secondary)] hover:bg-white/10 hover:text-white"
               :title="`Quality: ${callStore.callQuality}`"
             >
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 9h4V5H3v4zm0 8h4v-4H3v4zm0-4h4v-4H3v4zm8 4h4v-4h-4v4zm4-8v-4h-4v4h4zm4 8h4v-4h-4v4zm-8-8v-4H7v4h4zm4 8h4v-4h-4v4zm0-16v4h4V5h-4zm-4 4H7v4h4V9zM3 5v4h4V5H3zm0 8h4v-4H3v4zm0 4h4v-4H3v4zm8 0h4v-4h-4v4zm4 0h4v-4h-4v4z"/></svg>
             </button>
             <div
               v-if="showQuality"
+              v-click-outside="() => showQuality = false"
               class="absolute bottom-10 left-0 bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl shadow-xl overflow-hidden z-10 w-28"
             >
               <button
                 v-for="q in (['low', 'medium', 'high'] as const)"
                 :key="q"
                 @click="setQuality(q)"
-                class="w-full px-3 py-2 text-left text-xs font-bold transition-all hover:bg-white/5"
+                class="w-full px-3 py-2 text-left text-xs font-bold transition-all hover:bg-white/5 flex items-center space-x-2"
                 :class="callStore.callQuality === q ? 'text-[var(--v-accent)]' : 'text-[var(--v-text-secondary)]'"
               >
-                {{ q === 'low' ? '🔵 Low' : q === 'medium' ? '🟡 Medium' : '🟢 High' }}
+                <span>{{ q === 'low' ? '🔵' : q === 'medium' ? '🟡' : '🟢' }}</span>
+                <span class="capitalize">{{ q }}</span>
               </button>
             </div>
           </div>
@@ -146,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useCallStore } from '../stores/callStore'
 import { useSocketStore } from '../stores/domain/socketStore'
 import type { CallQuality } from '../utils/webrtc'
@@ -161,6 +156,19 @@ const vSrcObject = {
     },
 }
 
+// Simple click-outside directive
+const vClickOutside = {
+    mounted(el: HTMLElement, { value }: { value: () => void }) {
+        (el as any)._clickOutside = (e: MouseEvent) => {
+            if (!el.contains(e.target as Node)) value()
+        }
+        document.addEventListener('mousedown', (el as any)._clickOutside)
+    },
+    unmounted(el: HTMLElement) {
+        document.removeEventListener('mousedown', (el as any)._clickOutside)
+    },
+}
+
 const callStore = useCallStore()
 const socketStore = useSocketStore()
 
@@ -169,14 +177,14 @@ const interruptedCall = ref(callStore.getInterruptedCall())
 
 function reconnect() {
     if (!interruptedCall.value) return
-    const socket = socketStore.getSocket()
-    if (socket) socketStore.initiateCall(interruptedCall.value.peerId, interruptedCall.value.callType)
+    socketStore.initiateCall(interruptedCall.value.peerId, interruptedCall.value.callType)
     interruptedCall.value = null
 }
 
 // ── Visibility ────────────────────────────────────────────────────────────────
 const visible = computed(() =>
-    callStore.callState === 'connecting' || callStore.callState === 'active' || callStore.callState === 'ringing-out'
+    callStore.callState === 'connecting' || callStore.callState === 'active' ||
+    callStore.callState === 'ringing-out' || callStore.callState === 'ringing-in'
 )
 
 const hasRemoteVideo = computed(() => {
@@ -199,72 +207,98 @@ async function setQuality(q: CallQuality) {
 // ── Drag & corner snap ────────────────────────────────────────────────────────
 type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
+const overlayRef = ref<HTMLElement | null>(null)
 const corner = ref<Corner>('bottom-right')
-const isDragging = ref(false)
+let isDragging = false
 let dragOffsetX = 0
 let dragOffsetY = 0
-let currentX = 0
-let currentY = 0
+let lastX = 0
+let lastY = 0
+const OVERLAY_W = 288  // w-72 = 18rem
+const PAD = 24
 
-const PADDING = 24
-const W = 288 // w-72 = 18rem = 288px
-
-const cornerStyle = computed(() => {
-    switch (corner.value) {
-        case 'top-left':     return { top: `${PADDING}px`,    left: `${PADDING}px` }
-        case 'top-right':    return { top: `${PADDING}px`,    right: `${PADDING}px` }
-        case 'bottom-left':  return { bottom: `${PADDING}px`, left: `${PADDING}px` }
-        case 'bottom-right': return { bottom: `${PADDING}px`, right: `${PADDING}px` }
+function applyCorner(el: HTMLElement, c: Corner) {
+    el.style.top = ''
+    el.style.left = ''
+    el.style.bottom = ''
+    el.style.right = ''
+    switch (c) {
+        case 'top-left':     el.style.top = `${PAD}px`;    el.style.left = `${PAD}px`; break
+        case 'top-right':    el.style.top = `${PAD}px`;    el.style.right = `${PAD}px`; break
+        case 'bottom-left':  el.style.bottom = `${PAD}px`; el.style.left = `${PAD}px`; break
+        case 'bottom-right': el.style.bottom = `${PAD}px`; el.style.right = `${PAD}px`; break
     }
-})
+}
 
-const dragStyle = ref<Record<string, string>>({})
-
-const overlayStyle = computed(() =>
-    isDragging.value ? dragStyle.value : cornerStyle.value
-)
+// Apply corner when overlay first appears or corner changes
+watch([visible, corner, overlayRef], async ([vis]) => {
+    if (!vis) return
+    await nextTick()
+    const el = overlayRef.value
+    if (el) applyCorner(el, corner.value)
+}, { immediate: true })
 
 function startDrag(e: MouseEvent) {
+    // Don't start drag if user clicked a button
     if ((e.target as HTMLElement).closest('button')) return
-    isDragging.value = true
+    const el = overlayRef.value
+    if (!el) return
 
-    const el = (e.currentTarget as HTMLElement).closest<HTMLElement>('.fixed')!
     const rect = el.getBoundingClientRect()
     dragOffsetX = e.clientX - rect.left
     dragOffsetY = e.clientY - rect.top
-    currentX = rect.left
-    currentY = rect.top
+    lastX = rect.left
+    lastY = rect.top
 
-    dragStyle.value = { top: `${currentY}px`, left: `${currentX}px`, right: 'unset', bottom: 'unset' }
+    // Switch to top/left positioning immediately via direct DOM
+    el.style.transition = 'none'
+    el.style.bottom = ''
+    el.style.right = ''
+    el.style.top = `${rect.top}px`
+    el.style.left = `${rect.left}px`
+    isDragging = true
 
     window.addEventListener('mousemove', onDrag)
     window.addEventListener('mouseup', stopDrag)
+    e.preventDefault()
 }
 
 function onDrag(e: MouseEvent) {
-    if (!isDragging.value) return
-    currentX = e.clientX - dragOffsetX
-    currentY = e.clientY - dragOffsetY
-    dragStyle.value = { top: `${currentY}px`, left: `${currentX}px`, right: 'unset', bottom: 'unset' }
+    if (!isDragging) return
+    const el = overlayRef.value
+    if (!el) return
+    lastX = e.clientX - dragOffsetX
+    lastY = e.clientY - dragOffsetY
+    el.style.left = `${lastX}px`
+    el.style.top = `${lastY}px`
 }
 
-function stopDrag(e: MouseEvent) {
-    isDragging.value = false
+function stopDrag() {
+    if (!isDragging) return
+    isDragging = false
     window.removeEventListener('mousemove', onDrag)
     window.removeEventListener('mouseup', stopDrag)
 
-    // Snap to nearest corner based on center position
-    const cx = e.clientX - dragOffsetX + W / 2
-    const cy = e.clientY - dragOffsetY
+    // Snap to nearest corner based on center of overlay
+    const cx = lastX + OVERLAY_W / 2
+    const cy = lastY
     const midX = window.innerWidth / 2
     const midY = window.innerHeight / 2
 
-    if (cx < midX && cy < midY)       corner.value = 'top-left'
-    else if (cx >= midX && cy < midY) corner.value = 'top-right'
-    else if (cx < midX && cy >= midY) corner.value = 'bottom-left'
-    else                               corner.value = 'bottom-right'
+    let newCorner: Corner
+    if (cx < midX && cy < midY)       newCorner = 'top-left'
+    else if (cx >= midX && cy < midY) newCorner = 'top-right'
+    else if (cx < midX && cy >= midY) newCorner = 'bottom-left'
+    else                               newCorner = 'bottom-right'
 
-    dragStyle.value = {}
+    const el = overlayRef.value
+    if (el) {
+        el.style.transition = 'all 0.2s ease'
+        applyCorner(el, newCorner)
+        // Clear transition after animation
+        setTimeout(() => { if (overlayRef.value) overlayRef.value.style.transition = '' }, 220)
+    }
+    corner.value = newCorner
 }
 
 onUnmounted(() => {
@@ -276,6 +310,7 @@ onUnmounted(() => {
 const statusLabel = computed(() => {
     switch (callStore.callState) {
         case 'ringing-out': return 'Calling...'
+        case 'ringing-in':  return 'Incoming...'
         case 'connecting':  return 'Connecting...'
         case 'active':      return 'In call'
         default: return ''
