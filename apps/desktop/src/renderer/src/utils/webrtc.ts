@@ -31,7 +31,9 @@ export function createPeerConnection(
     const pc = new RTCPeerConnection({ iceServers })
 
     pc.ontrack = (event) => {
-        if (event.streams[0]) onRemoteStream(event.streams[0])
+        // Create new MediaStream on every track event so Vue detects the ref change
+        // and re-evaluates hasRemoteVideo (same object ref = no reactivity trigger)
+        if (event.streams[0]) onRemoteStream(new MediaStream(event.streams[0].getTracks()))
     }
 
     pc.onicecandidate = (event) => {
@@ -69,13 +71,35 @@ export function createPeerConnection(
     return pc
 }
 
-export async function getAudioStream(): Promise<MediaStream> {
-    return navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+export async function getAudioStream(quality: CallQuality = 'medium'): Promise<MediaStream> {
+    return navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS[quality], video: false })
 }
 
-export async function getCameraTrack(): Promise<MediaStreamTrack> {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+export type CallQuality = 'low' | 'medium' | 'high'
+
+const VIDEO_CONSTRAINTS: Record<CallQuality, MediaTrackConstraints> = {
+    low:    { width: 320,  height: 240,  frameRate: 15 },
+    medium: { width: 640,  height: 480,  frameRate: 30 },
+    high:   { width: 1280, height: 720,  frameRate: 60 },
+}
+
+const AUDIO_CONSTRAINTS: Record<CallQuality, MediaTrackConstraints> = {
+    low:    { sampleRate: 16000, echoCancellation: true, noiseSuppression: true },
+    medium: { sampleRate: 32000, echoCancellation: true, noiseSuppression: true },
+    high:   { sampleRate: 48000, echoCancellation: true, noiseSuppression: true, channelCount: 2 },
+}
+
+export async function getCameraTrack(quality: CallQuality = 'medium'): Promise<MediaStreamTrack> {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS[quality], audio: false })
     return stream.getVideoTracks()[0]
+}
+
+export async function applyVideoQuality(sender: RTCRtpSender, quality: CallQuality) {
+    const bitrates: Record<CallQuality, number> = { low: 150_000, medium: 500_000, high: 1_500_000 }
+    const params = sender.getParameters()
+    if (!params.encodings || params.encodings.length === 0) params.encodings = [{}]
+    params.encodings[0].maxBitrate = bitrates[quality]
+    await sender.setParameters(params)
 }
 
 export async function getScreenTrack(): Promise<MediaStreamTrack> {

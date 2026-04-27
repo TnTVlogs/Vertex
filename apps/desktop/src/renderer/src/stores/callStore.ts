@@ -11,6 +11,8 @@ import {
     addIceCandidate,
     getCameraTrack,
     getScreenTrack,
+    applyVideoQuality,
+    type CallQuality,
 } from '../utils/webrtc'
 import type { Socket } from 'socket.io-client'
 import { useAuthStore } from './authStore'
@@ -25,6 +27,8 @@ export interface CallInfo {
     peerName: string
 }
 
+const SESSION_KEY = 'vertex:interrupted-call'
+
 export const useCallStore = defineStore('call', () => {
     const callState = ref<CallState>('idle')
     const callInfo = ref<CallInfo | null>(null)
@@ -33,6 +37,7 @@ export const useCallStore = defineStore('call', () => {
     const isMuted = ref(false)
     const isVideoOn = ref(false)
     const isScreenSharing = ref(false)
+    const callQuality = ref<CallQuality>('medium')
     const pc = ref<RTCPeerConnection | null>(null)
     let cameraTrack: MediaStreamTrack | null = null
     let screenTrack: MediaStreamTrack | null = null
@@ -50,6 +55,36 @@ export const useCallStore = defineStore('call', () => {
         screenTrack?.stop(); screenTrack = null
         pc.value?.close()
         pc.value = null
+        sessionStorage.removeItem(SESSION_KEY)
+    }
+
+    function getInterruptedCall(): CallInfo | null {
+        try {
+            const raw = sessionStorage.getItem(SESSION_KEY)
+            if (!raw) return null
+            const data = JSON.parse(raw)
+            if (Date.now() - data.ts > 30_000) {
+                sessionStorage.removeItem(SESSION_KEY)
+                return null
+            }
+            return { callId: data.callId, callType: data.callType, peerId: data.peerId, peerName: data.peerName }
+        } catch { return null }
+    }
+
+    async function setQuality(quality: CallQuality, socket: Socket) {
+        callQuality.value = quality
+        if (!pc.value) return
+        const videoSender = pc.value.getSenders().find(s => s.track?.kind === 'video')
+        if (videoSender) await applyVideoQuality(videoSender, quality)
+        if (isVideoOn.value && cameraTrack) {
+            const track = await getCameraTrack(quality)
+            const sender = pc.value.getSenders().find(s => s.track?.kind === 'video')
+            if (sender) await sender.replaceTrack(track)
+            cameraTrack.stop()
+            cameraTrack = track
+        }
+        const { callId } = callInfo.value ?? {}
+        if (callId) socket.emit('call:quality-change', { callId, quality })
     }
 
     function setRemoteStream(stream: MediaStream) {
@@ -65,6 +100,7 @@ export const useCallStore = defineStore('call', () => {
     function onInitiated(callId: string, callType: CallType, peerId: string, peerName: string) {
         callInfo.value = { callId, callType, peerId, peerName }
         callState.value = 'ringing-out'
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify({ callId, callType, peerId, peerName, ts: Date.now() }))
     }
 
     // Called when we receive an incoming call
@@ -86,7 +122,7 @@ export const useCallStore = defineStore('call', () => {
         callState.value = 'connecting'
         const { callId, peerId } = callInfo.value
         try {
-            const stream = await getAudioStream()
+            const stream = await getAudioStream(callQuality.value)
             localStream.value = stream
             pc.value = await makePC(callId, peerId, socket)
             addStreamToPeerConnection(pc.value, stream)
@@ -103,7 +139,7 @@ export const useCallStore = defineStore('call', () => {
         const { callId, peerId } = callInfo.value
         socket.emit('call:accepted', { callId })
         try {
-            const stream = await getAudioStream()
+            const stream = await getAudioStream(callQuality.value)
             localStream.value = stream
             pc.value = await makePC(callId, peerId, socket)
             addStreamToPeerConnection(pc.value, stream)
@@ -150,7 +186,7 @@ export const useCallStore = defineStore('call', () => {
             socket.emit('call:video-toggle', { callId, enabled: false })
         } else {
             try {
-                const track = await getCameraTrack()
+                const track = await getCameraTrack(callQuality.value)
                 cameraTrack = track
                 const sender = pc.value.getSenders().find(s => s.track?.kind === 'video')
                 if (sender) {
@@ -207,9 +243,10 @@ export const useCallStore = defineStore('call', () => {
     }
 
     return {
-        callState, callInfo, localStream, remoteStream, isMuted, isVideoOn, isScreenSharing,
+        callState, callInfo, localStream, remoteStream, isMuted, isVideoOn, isScreenSharing, callQuality,
         reset, onInitiated, onIncoming, onAccepted, acceptCall,
         onSdpOffer, onSdpAnswer, onIceCandidate,
         toggleMute, toggleCamera, toggleScreenShare, endCall, rejectCall,
+        setQuality, getInterruptedCall,
     }
 })

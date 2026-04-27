@@ -78,6 +78,7 @@ function openChannel(serverId: string, channelId: string) {
 async function handleServerClick(serverId: string) {
   // Already on this server — do nothing
   if (navStore.activeServerId === serverId && navStore.activeView === 'server') return
+  socketStore.joinServer(serverId)
 
   // Clear stale channels immediately so the sidebar doesn't show the old server's channels
   serverStore.clearChannels()
@@ -342,7 +343,8 @@ const onServerAction = async (value: string) => {
                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="opacity-50"><path d="M7 10l5 5 5-5z"/></svg>
              </h3>
              <div class="space-y-1">
-               <div v-for="channel in chatStore.channels" :key="channel.id"
+               <div v-for="channel in chatStore.channels" :key="channel.id" class="space-y-0.5">
+                 <div
                     class="flex items-center px-3 py-2 rounded-xl transition-all duration-200 group"
                     :class="[
                       channel.type === 'voice' ? 'cursor-default' : 'cursor-pointer',
@@ -351,23 +353,46 @@ const onServerAction = async (value: string) => {
                       channel.type === 'voice' ? 'text-[var(--v-text-secondary)]' : '',
                     ]"
                     @click="channel.type !== 'voice' && openChannel(navStore.activeServerId!, channel.id)"
-               >
-                 <!-- text channel icon -->
-                 <span v-if="channel.type !== 'voice'" class="mr-2 opacity-50 font-mono">#</span>
-                 <!-- voice channel icon -->
-                 <svg v-else viewBox="0 0 24 24" width="14" height="14" fill="currentColor" class="mr-2 opacity-50 shrink-0"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                 <span class="text-sm truncate flex-1">{{ channel.name }}</span>
-                 <!-- join button for voice channels -->
-                 <button
-                   v-if="channel.type === 'voice'"
-                   @click.stop="voiceStore.activeChannelId === channel.id ? voiceStore.leaveChannel(socketStore.getSocket()!) : joinVoiceChannel(channel.id)"
-                   :disabled="voiceStore.isConnecting"
-                   class="ml-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all disabled:cursor-wait"
-                   :class="voiceStore.activeChannelId === channel.id ? 'bg-red-500/20 text-red-400' : 'bg-[var(--v-accent)]/20 text-[var(--v-accent)] hover:bg-[var(--v-accent)]/40'"
                  >
-                   {{ voiceStore.activeChannelId === channel.id ? 'Leave' : 'Join' }}
-                 </button>
-                 <div v-if="channel.type === 'voice' && voiceStore.activeChannelId === channel.id" class="w-1.5 h-1.5 rounded-full bg-[var(--v-accent)] animate-pulse ml-1 shrink-0"></div>
+                   <!-- text channel icon -->
+                   <span v-if="channel.type !== 'voice'" class="mr-2 opacity-50 font-mono">#</span>
+                   <!-- voice channel icon -->
+                   <svg v-else viewBox="0 0 24 24" width="14" height="14" fill="currentColor" class="mr-2 opacity-50 shrink-0"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                   <span class="text-sm truncate flex-1">{{ channel.name }}</span>
+                   <!-- join button for voice channels -->
+                   <button
+                     v-if="channel.type === 'voice'"
+                     @click.stop="voiceStore.activeChannelId === channel.id ? voiceStore.leaveChannel(socketStore.getSocket()!) : joinVoiceChannel(channel.id)"
+                     :disabled="voiceStore.isConnecting"
+                     class="ml-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all disabled:cursor-wait"
+                     :class="voiceStore.activeChannelId === channel.id ? 'bg-red-500/20 text-red-400' : 'bg-[var(--v-accent)]/20 text-[var(--v-accent)] hover:bg-[var(--v-accent)]/40'"
+                   >
+                     {{ voiceStore.activeChannelId === channel.id ? 'Leave' : 'Join' }}
+                   </button>
+                   <div v-if="channel.type === 'voice' && voiceStore.activeChannelId === channel.id" class="w-1.5 h-1.5 rounded-full bg-[var(--v-accent)] animate-pulse ml-1 shrink-0"></div>
+                 </div>
+
+                 <!-- Voice channel member list (Discord-style) -->
+                 <div
+                   v-if="channel.type === 'voice' && (voiceStore.voiceChannelMembers.get(channel.id)?.length ?? 0) > 0"
+                   class="ml-6 space-y-0.5"
+                 >
+                   <div
+                     v-for="member in voiceStore.voiceChannelMembers.get(channel.id)"
+                     :key="member.userId"
+                     class="flex items-center space-x-2 px-2 py-1 rounded-lg"
+                   >
+                     <div class="w-5 h-5 rounded-md bg-[var(--v-bg-surface)] border border-[var(--v-border)] flex items-center justify-center shrink-0">
+                       <span class="text-[8px] font-black text-[var(--v-text-secondary)]">{{ member.username.charAt(0).toUpperCase() }}</span>
+                     </div>
+                     <span class="text-[11px] text-[var(--v-text-secondary)] truncate font-medium">{{ member.username }}</span>
+                     <!-- speaking indicator -->
+                     <div
+                       v-if="voiceStore.speakingUsers.has(member.userId)"
+                       class="w-1.5 h-1.5 rounded-full bg-[var(--v-accent)] animate-pulse ml-auto shrink-0"
+                     ></div>
+                   </div>
+                 </div>
                </div>
              </div>
            </section>

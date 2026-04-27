@@ -131,11 +131,18 @@ export const useSocketStore = defineStore('socket', {
                 this.socket.on('channel:speaking', (data: any) => {
                     useVoiceChannelStore().handleSpeaking(data)
                 })
+                this.socket.on('channel:voice-members', (data: any) => {
+                    useVoiceChannelStore().handleVoiceMembers(data)
+                })
             }
         },
 
         joinChannel(channelId: string) {
             this.socket?.emit('join-channel', channelId);
+        },
+
+        joinServer(serverId: string) {
+            this.socket?.emit('join-server', serverId);
         },
 
         initiateCall(targetUserId: string, callType: 'audio' | 'video') {

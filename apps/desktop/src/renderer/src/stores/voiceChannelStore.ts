@@ -27,6 +27,8 @@ export const useVoiceChannelStore = defineStore('voiceChannel', () => {
     const isConnecting = ref(false)
     const isSpeaking = ref(false)
     const speakingUsers = ref<Set<string>>(new Set())
+    // Maps channelId → list of members currently in that voice channel
+    const voiceChannelMembers = ref<Map<string, { userId: string; username: string }[]>>(new Map())
 
     let device: Device | null = null
     let sendTransport: any = null
@@ -135,6 +137,11 @@ export const useVoiceChannelStore = defineStore('voiceChannel', () => {
         if (data.channelId !== activeChannelId.value) return
         if (data.speaking) speakingUsers.value.add(data.userId)
         else speakingUsers.value.delete(data.userId)
+    }
+
+    function handleVoiceMembers(data: { channelId: string; members: { userId: string; username: string }[] }) {
+        voiceChannelMembers.value.set(data.channelId, data.members)
+        voiceChannelMembers.value = new Map(voiceChannelMembers.value)
     }
 
     function toggleMute() {
@@ -278,12 +285,13 @@ export const useVoiceChannelStore = defineStore('voiceChannel', () => {
         isSpeaking.value = false
         activeChannelId.value = null
         isMuted.value = false
+        // Leave voice channel → server will broadcast empty member list
     }
 
     return {
         activeChannelId, peers, localStream, localVideoStream,
-        isMuted, isVideoOn, isScreenSharing, isConnecting, isSpeaking, speakingUsers,
+        isMuted, isVideoOn, isScreenSharing, isConnecting, isSpeaking, speakingUsers, voiceChannelMembers,
         joinChannel, leaveChannel, toggleMute, toggleCamera, toggleScreenShare,
-        handleNewProducer, handleProducerClosed, handlePeerLeft, handlePeerJoined, handleSpeaking,
+        handleNewProducer, handleProducerClosed, handlePeerLeft, handlePeerJoined, handleSpeaking, handleVoiceMembers,
     }
 })

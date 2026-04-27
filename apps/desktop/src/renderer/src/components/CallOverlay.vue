@@ -1,21 +1,34 @@
 <template>
   <Teleport to="body">
+    <!-- Reconnect banner (shown when interrupted call detected) -->
+    <div
+      v-if="interruptedCall"
+      class="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[var(--v-bg-surface)] border border-[var(--v-accent)]/40 rounded-xl px-4 py-3 flex items-center space-x-3 shadow-xl"
+    >
+      <span class="text-xs font-bold text-[var(--v-accent)]">Call interrupted</span>
+      <span class="text-xs text-[var(--v-text-secondary)]">with {{ interruptedCall.peerName }}</span>
+      <button @click="reconnect" class="px-3 py-1 rounded-lg bg-[var(--v-accent)]/20 text-[var(--v-accent)] text-xs font-black hover:bg-[var(--v-accent)]/40 transition-all">Reconnect</button>
+      <button @click="interruptedCall = null" class="text-[var(--v-text-secondary)] hover:text-white text-xs">✕</button>
+    </div>
+
     <div
       v-if="visible"
-      class="fixed bottom-6 right-6 z-[199] w-72 bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300"
+      :style="overlayStyle"
+      class="fixed z-[199] w-72 bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-2xl shadow-2xl overflow-hidden select-none"
+      :class="{ 'transition-all duration-200': !isDragging }"
     >
       <!-- Audio elements (always hidden) -->
-      <audio ref="localAudio" autoplay muted :srcObject="callStore.localStream ?? undefined" />
-      <audio ref="remoteAudio" autoplay :srcObject="callStore.remoteStream ?? undefined" />
+      <audio ref="localAudio" autoplay muted v-src-object="callStore.localStream ?? null" />
+      <audio ref="remoteAudio" autoplay v-src-object="callStore.remoteStream ?? null" />
 
       <!-- Remote video (when peer has video) -->
-      <div v-if="hasRemoteVideo" class="relative bg-black w-full aspect-video">
+      <div v-if="hasRemoteVideo && !isMinimized" class="relative bg-black w-full aspect-video">
         <video
           ref="remoteVideo"
           autoplay
           playsinline
           class="w-full h-full object-contain"
-          :srcObject="callStore.remoteStream ?? undefined"
+          v-src-object="callStore.remoteStream ?? null"
         />
         <!-- Local PiP preview -->
         <div v-if="callStore.isVideoOn" class="absolute bottom-2 right-2 w-20 aspect-video bg-black rounded-lg overflow-hidden border border-white/20">
@@ -25,13 +38,16 @@
             playsinline
             muted
             class="w-full h-full object-cover"
-            :srcObject="callStore.localStream ?? undefined"
+            v-src-object="callStore.localStream ?? null"
           />
         </div>
       </div>
 
-      <!-- Header -->
-      <div class="px-4 py-3 border-b border-[var(--v-border)] flex items-center justify-between">
+      <!-- Header (drag handle) -->
+      <div
+        class="px-4 py-3 border-b border-[var(--v-border)] flex items-center justify-between cursor-grab active:cursor-grabbing"
+        @mousedown.prevent="startDrag"
+      >
         <div class="flex items-center space-x-3">
           <div class="w-8 h-8 rounded-xl bg-[var(--v-accent)]/10 flex items-center justify-center text-xs font-black text-[var(--v-accent)]">
             {{ callStore.callInfo?.peerName?.charAt(0).toUpperCase() ?? '?' }}
@@ -41,11 +57,22 @@
             <p class="text-[9px] font-bold uppercase tracking-widest mt-0.5" :class="statusColor">{{ statusLabel }}</p>
           </div>
         </div>
-        <span v-if="callStore.callState === 'active'" class="text-xs font-mono text-[var(--v-text-secondary)]">{{ timer }}</span>
+        <div class="flex items-center space-x-1">
+          <span v-if="callStore.callState === 'active'" class="text-xs font-mono text-[var(--v-text-secondary)] mr-1">{{ timer }}</span>
+          <!-- Minimize -->
+          <button
+            @click.stop="isMinimized = !isMinimized"
+            class="w-6 h-6 rounded-lg flex items-center justify-center text-[var(--v-text-secondary)] hover:bg-white/10 hover:text-white transition-all"
+            :title="isMinimized ? 'Expand' : 'Minimize'"
+          >
+            <svg v-if="!isMinimized" viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
+            <svg v-else viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          </button>
+        </div>
       </div>
 
-      <!-- Controls -->
-      <div class="px-4 py-3 flex items-center justify-between">
+      <!-- Controls (hidden when minimized) -->
+      <div v-if="!isMinimized" class="px-4 py-3 flex items-center justify-between">
         <div class="flex items-center space-x-2">
           <!-- Mute mic -->
           <button
@@ -79,6 +106,31 @@
           >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h3l-1 1v1h12v-1l-1-1h3c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13H4V5h16v11z"/></svg>
           </button>
+
+          <!-- Quality selector -->
+          <div v-if="callStore.callState === 'active'" class="relative">
+            <button
+              @click.stop="showQuality = !showQuality"
+              class="w-9 h-9 rounded-xl flex items-center justify-center transition-all bg-white/5 text-[var(--v-text-secondary)] hover:bg-white/10 hover:text-white"
+              :title="`Quality: ${callStore.callQuality}`"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+            </button>
+            <div
+              v-if="showQuality"
+              class="absolute bottom-10 left-0 bg-[var(--v-bg-surface)] border border-[var(--v-border)] rounded-xl shadow-xl overflow-hidden z-10 w-28"
+            >
+              <button
+                v-for="q in (['low', 'medium', 'high'] as const)"
+                :key="q"
+                @click="setQuality(q)"
+                class="w-full px-3 py-2 text-left text-xs font-bold transition-all hover:bg-white/5"
+                :class="callStore.callQuality === q ? 'text-[var(--v-accent)]' : 'text-[var(--v-text-secondary)]'"
+              >
+                {{ q === 'low' ? '🔵 Low' : q === 'medium' ? '🟡 Medium' : '🟢 High' }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- End call -->
@@ -94,13 +146,35 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useCallStore } from '../stores/callStore'
 import { useSocketStore } from '../stores/domain/socketStore'
+import type { CallQuality } from '../utils/webrtc'
+
+// Vue doesn't reliably set srcObject as a DOM property via :srcObject binding
+const vSrcObject = {
+    mounted(el: HTMLMediaElement, { value }: { value: MediaStream | null }) {
+        el.srcObject = value
+    },
+    updated(el: HTMLMediaElement, { value }: { value: MediaStream | null }) {
+        if (el.srcObject !== value) el.srcObject = value
+    },
+}
 
 const callStore = useCallStore()
 const socketStore = useSocketStore()
 
+// ── Interrupted call reconnect ────────────────────────────────────────────────
+const interruptedCall = ref(callStore.getInterruptedCall())
+
+function reconnect() {
+    if (!interruptedCall.value) return
+    const socket = socketStore.getSocket()
+    if (socket) socketStore.initiateCall(interruptedCall.value.peerId, interruptedCall.value.callType)
+    interruptedCall.value = null
+}
+
+// ── Visibility ────────────────────────────────────────────────────────────────
 const visible = computed(() =>
     callStore.callState === 'connecting' || callStore.callState === 'active' || callStore.callState === 'ringing-out'
 )
@@ -110,11 +184,100 @@ const hasRemoteVideo = computed(() => {
     return callStore.remoteStream.getVideoTracks().some(t => t.enabled && t.readyState === 'live')
 })
 
+// ── Minimize ──────────────────────────────────────────────────────────────────
+const isMinimized = ref(false)
+
+// ── Quality selector ──────────────────────────────────────────────────────────
+const showQuality = ref(false)
+
+async function setQuality(q: CallQuality) {
+    const socket = socketStore.getSocket()
+    if (socket) await callStore.setQuality(q, socket)
+    showQuality.value = false
+}
+
+// ── Drag & corner snap ────────────────────────────────────────────────────────
+type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+
+const corner = ref<Corner>('bottom-right')
+const isDragging = ref(false)
+let dragOffsetX = 0
+let dragOffsetY = 0
+let currentX = 0
+let currentY = 0
+
+const PADDING = 24
+const W = 288 // w-72 = 18rem = 288px
+
+const cornerStyle = computed(() => {
+    switch (corner.value) {
+        case 'top-left':     return { top: `${PADDING}px`,    left: `${PADDING}px` }
+        case 'top-right':    return { top: `${PADDING}px`,    right: `${PADDING}px` }
+        case 'bottom-left':  return { bottom: `${PADDING}px`, left: `${PADDING}px` }
+        case 'bottom-right': return { bottom: `${PADDING}px`, right: `${PADDING}px` }
+    }
+})
+
+const dragStyle = ref<Record<string, string>>({})
+
+const overlayStyle = computed(() =>
+    isDragging.value ? dragStyle.value : cornerStyle.value
+)
+
+function startDrag(e: MouseEvent) {
+    if ((e.target as HTMLElement).closest('button')) return
+    isDragging.value = true
+
+    const el = (e.currentTarget as HTMLElement).closest<HTMLElement>('.fixed')!
+    const rect = el.getBoundingClientRect()
+    dragOffsetX = e.clientX - rect.left
+    dragOffsetY = e.clientY - rect.top
+    currentX = rect.left
+    currentY = rect.top
+
+    dragStyle.value = { top: `${currentY}px`, left: `${currentX}px`, right: 'unset', bottom: 'unset' }
+
+    window.addEventListener('mousemove', onDrag)
+    window.addEventListener('mouseup', stopDrag)
+}
+
+function onDrag(e: MouseEvent) {
+    if (!isDragging.value) return
+    currentX = e.clientX - dragOffsetX
+    currentY = e.clientY - dragOffsetY
+    dragStyle.value = { top: `${currentY}px`, left: `${currentX}px`, right: 'unset', bottom: 'unset' }
+}
+
+function stopDrag(e: MouseEvent) {
+    isDragging.value = false
+    window.removeEventListener('mousemove', onDrag)
+    window.removeEventListener('mouseup', stopDrag)
+
+    // Snap to nearest corner based on center position
+    const cx = e.clientX - dragOffsetX + W / 2
+    const cy = e.clientY - dragOffsetY
+    const midX = window.innerWidth / 2
+    const midY = window.innerHeight / 2
+
+    if (cx < midX && cy < midY)       corner.value = 'top-left'
+    else if (cx >= midX && cy < midY) corner.value = 'top-right'
+    else if (cx < midX && cy >= midY) corner.value = 'bottom-left'
+    else                               corner.value = 'bottom-right'
+
+    dragStyle.value = {}
+}
+
+onUnmounted(() => {
+    window.removeEventListener('mousemove', onDrag)
+    window.removeEventListener('mouseup', stopDrag)
+})
+
+// ── Status ────────────────────────────────────────────────────────────────────
 const statusLabel = computed(() => {
     switch (callStore.callState) {
         case 'ringing-out': return 'Calling...'
-        case 'connecting': return 'Connecting...'
-        case 'active': return 'In call'
+        case 'connecting':  return 'Connecting...'
+        case 'active':      return 'In call'
         default: return ''
     }
 })
@@ -123,6 +286,7 @@ const statusColor = computed(() =>
     callStore.callState === 'active' ? 'text-[var(--v-accent)]' : 'text-[var(--v-text-secondary)]'
 )
 
+// ── Timer ─────────────────────────────────────────────────────────────────────
 const seconds = ref(0)
 let timerInterval: ReturnType<typeof setInterval> | null = null
 
@@ -145,6 +309,7 @@ onUnmounted(() => {
     if (timerInterval) clearInterval(timerInterval)
 })
 
+// ── Actions ───────────────────────────────────────────────────────────────────
 function end() {
     const socket = socketStore.getSocket()
     if (socket) callStore.endCall(socket)

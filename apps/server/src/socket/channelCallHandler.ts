@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io'
 import { z } from 'zod'
 import { sfuService } from '../services/sfuService'
 import { serverService } from '../services/serverService'
+import prisma from '../services/prisma'
 import logger from '../utils/logger'
 
 const joinSchema = z.object({ channelId: z.string().uuid() })
@@ -28,6 +29,20 @@ export function registerChannelCallHandler(io: Server, socket: Socket) {
 
     function err(msg: string) { socket.emit('channel:error', { message: msg }) }
 
+    async function broadcastVoiceMembers(channelId: string) {
+        const serverId = await serverService.getChannelServerId(channelId)
+        if (!serverId) return
+        const peerIds = sfuService.getRoomPeerIds(channelId)
+        const users = await prisma.user.findMany({
+            where: { id: { in: peerIds } },
+            select: { id: true, username: true },
+        })
+        io.to(`server:${serverId}`).emit('channel:voice-members', {
+            channelId,
+            members: users.map(u => ({ userId: u.id, username: u.username })),
+        })
+    }
+
     // ── channel:join-voice ─────────────────────────────────────────────────────
     socket.on('channel:join-voice', async (data: unknown) => {
         const parsed = joinSchema.safeParse(data)
@@ -49,6 +64,7 @@ export function registerChannelCallHandler(io: Server, socket: Socket) {
                 channelId, peerId: userId,
             })
 
+            broadcastVoiceMembers(channelId)
             logger.info({ userId, channelId }, 'channel:join-voice')
         } catch (e: any) {
             logger.error({ err: e }, 'channel:join-voice failed')
@@ -159,6 +175,7 @@ export function registerChannelCallHandler(io: Server, socket: Socket) {
             channelId, peerId: userId,
         })
 
+        broadcastVoiceMembers(channelId)
         logger.info({ userId, channelId }, 'channel:leave-voice')
     }
 }

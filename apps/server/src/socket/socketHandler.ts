@@ -119,6 +119,12 @@ export const handleSocketConnections = (io: Server) => {
             socket.join(`channel:${channelId}`);
         });
 
+        socket.on('join-server', async (serverId: string) => {
+            const userId = socket.data.userId as string;
+            const isMember = await serverService.isUserMemberOfServer(userId, serverId);
+            if (isMember) socket.join(`server:${serverId}`);
+        });
+
         socket.on('send-message', async (data, callback) => {
             const userId = socket.data.userId as string;
             const sessionId = socket.data.sessionId as string;

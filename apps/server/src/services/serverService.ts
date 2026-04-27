@@ -123,6 +123,21 @@ export const serverService = {
         return !!member;
     },
 
+    async isUserMemberOfServer(userId: string, serverId: string): Promise<boolean> {
+        const member = await prisma.member.findUnique({
+            where: { serverId_userId: { serverId, userId } }
+        });
+        return !!member;
+    },
+
+    async getChannelServerId(channelId: string): Promise<string | null> {
+        const channel = await prisma.channel.findUnique({
+            where: { id: channelId },
+            select: { serverId: true }
+        });
+        return channel?.serverId ?? null
+    },
+
     async joinServerByCode(inviteCode: string, userId: string) {
         return prisma.$transaction(async (tx) => {
             const server = await tx.server.findUnique({
